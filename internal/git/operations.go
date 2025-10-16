@@ -12,6 +12,7 @@ type GitRepository interface {
 	CreateBranch(name, baseBranch string) error
 	CheckoutBranch(name string) error
 	IsGitRepository() bool
+	SearchBranches(searchTerm string) (BranchSearchResult, error)
 }
 
 // GitError represents a Git operation error
@@ -158,4 +159,15 @@ func (g *LocalGitRepository) CheckoutBranch(name string) error {
 	}
 
 	return nil
+}
+
+// SearchBranches searches for branches matching the given search term
+func (g *LocalGitRepository) SearchBranches(searchTerm string) (BranchSearchResult, error) {
+	branches, err := g.GetLocalBranches()
+	if err != nil {
+		return BranchSearchResult{}, err
+	}
+
+	result := FilterBranchesRealtime(branches, searchTerm)
+	return result, nil
 }
