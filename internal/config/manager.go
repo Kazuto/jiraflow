@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
+
+	"jiraflow/internal/errors"
 )
 
 // FileConfigManager implements the ConfigManager interface for file-based configuration
@@ -38,27 +40,27 @@ func (m *FileConfigManager) Load() (*Config, error) {
 	if _, err := os.Stat(m.configPath); os.IsNotExist(err) {
 		// Create default configuration if file doesn't exist
 		if err := m.CreateDefault(); err != nil {
-			return nil, fmt.Errorf("failed to create default configuration: %w", err)
+			return nil, errors.NewConfigError("", nil, fmt.Sprintf("failed to create default configuration: %v", err), true)
 		}
 	}
 
 	// Read the configuration file
 	data, err := os.ReadFile(m.configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read configuration file %s: %w", m.configPath, err)
+		return nil, errors.NewConfigError("", m.configPath, fmt.Sprintf("failed to read configuration file: %v", err), true)
 	}
 
 	// Parse YAML content
 	var config Config
 	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to parse configuration file %s: %w", m.configPath, err)
+		return nil, errors.NewConfigError("", m.configPath, fmt.Sprintf("failed to parse YAML configuration: %v", err), true)
 	}
 
 	// Validate and fix the loaded configuration
 	result := ValidateAndFix(&config)
 	if !result.IsValid() {
 		// If there are validation errors that couldn't be fixed, return the first error
-		return nil, fmt.Errorf("configuration validation failed: %s", result.Errors[0].Error())
+		return nil, &result.Errors[0]
 	}
 
 	// Log warnings if any values were fixed
@@ -77,7 +79,7 @@ func (m *FileConfigManager) CreateDefault() error {
 	// Create the directory structure
 	configDir := filepath.Dir(m.configPath)
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("failed to create configuration directory %s: %w", configDir, err)
+		return errors.NewConfigError("", configDir, fmt.Sprintf("failed to create configuration directory: %v", err), false)
 	}
 
 	// Create YAML content with comments
@@ -106,7 +108,7 @@ sanitization:
 
 	// Write to file
 	if err := os.WriteFile(m.configPath, []byte(yamlContent), 0644); err != nil {
-		return fmt.Errorf("failed to write default configuration to %s: %w", m.configPath, err)
+		return errors.NewConfigError("", m.configPath, fmt.Sprintf("failed to write default configuration: %v", err), false)
 	}
 
 	return nil

@@ -3,6 +3,8 @@ package git
 import (
 	"os/exec"
 	"strings"
+
+	"jiraflow/internal/errors"
 )
 
 // GitRepository interface defines Git operations
@@ -16,15 +18,8 @@ type GitRepository interface {
 	SearchBranches(searchTerm string) (BranchSearchResult, error)
 }
 
-// GitError represents a Git operation error
-type GitError struct {
-	Operation string
-	Message   string
-}
-
-func (e GitError) Error() string {
-	return "git " + e.Operation + ": " + e.Message
-}
+// GitError is an alias for the centralized GitError type
+type GitError = errors.GitError
 
 // LocalGitRepository implements GitRepository for local Git operations
 type LocalGitRepository struct{}
@@ -44,19 +39,13 @@ func (g *LocalGitRepository) IsGitRepository() bool {
 // GetLocalBranches returns a list of local Git branches
 func (g *LocalGitRepository) GetLocalBranches() ([]string, error) {
 	if !g.IsGitRepository() {
-		return nil, GitError{
-			Operation: "branch",
-			Message:   "not a git repository",
-		}
+		return nil, errors.NewGitError("branch", "not a git repository", false)
 	}
 
 	cmd := exec.Command("git", "branch", "--format=%(refname:short)")
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, GitError{
-			Operation: "branch",
-			Message:   "failed to list branches: " + err.Error(),
-		}
+		return nil, errors.NewGitError("branch", "failed to list branches: "+err.Error(), true)
 	}
 
 	branches := strings.Split(strings.TrimSpace(string(output)), "\n")
@@ -75,27 +64,18 @@ func (g *LocalGitRepository) GetLocalBranches() ([]string, error) {
 // GetCurrentBranch returns the name of the current Git branch
 func (g *LocalGitRepository) GetCurrentBranch() (string, error) {
 	if !g.IsGitRepository() {
-		return "", GitError{
-			Operation: "branch",
-			Message:   "not a git repository",
-		}
+		return "", errors.NewGitError("branch", "not a git repository", false)
 	}
 
 	cmd := exec.Command("git", "branch", "--show-current")
 	output, err := cmd.Output()
 	if err != nil {
-		return "", GitError{
-			Operation: "branch",
-			Message:   "failed to get current branch: " + err.Error(),
-		}
+		return "", errors.NewGitError("branch", "failed to get current branch: "+err.Error(), true)
 	}
 
 	currentBranch := strings.TrimSpace(string(output))
 	if currentBranch == "" {
-		return "", GitError{
-			Operation: "branch",
-			Message:   "no current branch (detached HEAD?)",
-		}
+		return "", errors.NewGitError("branch", "no current branch (detached HEAD?)", true)
 	}
 
 	return currentBranch, nil
@@ -104,32 +84,20 @@ func (g *LocalGitRepository) GetCurrentBranch() (string, error) {
 // CreateBranch creates a new Git branch from the specified base branch
 func (g *LocalGitRepository) CreateBranch(name, baseBranch string) error {
 	if !g.IsGitRepository() {
-		return GitError{
-			Operation: "branch",
-			Message:   "not a git repository",
-		}
+		return errors.NewGitError("branch", "not a git repository", false)
 	}
 
 	if name == "" {
-		return GitError{
-			Operation: "branch",
-			Message:   "branch name cannot be empty",
-		}
+		return errors.NewGitError("branch", "branch name cannot be empty", false)
 	}
 
 	if baseBranch == "" {
-		return GitError{
-			Operation: "branch",
-			Message:   "base branch cannot be empty",
-		}
+		return errors.NewGitError("branch", "base branch cannot be empty", false)
 	}
 
 	cmd := exec.Command("git", "branch", name, baseBranch)
 	if err := cmd.Run(); err != nil {
-		return GitError{
-			Operation: "branch",
-			Message:   "failed to create branch '" + name + "' from '" + baseBranch + "': " + err.Error(),
-		}
+		return errors.NewGitError("branch", "failed to create branch '"+name+"' from '"+baseBranch+"': "+err.Error(), true)
 	}
 
 	return nil
@@ -138,25 +106,16 @@ func (g *LocalGitRepository) CreateBranch(name, baseBranch string) error {
 // CheckoutBranch switches to the specified Git branch
 func (g *LocalGitRepository) CheckoutBranch(name string) error {
 	if !g.IsGitRepository() {
-		return GitError{
-			Operation: "checkout",
-			Message:   "not a git repository",
-		}
+		return errors.NewGitError("checkout", "not a git repository", false)
 	}
 
 	if name == "" {
-		return GitError{
-			Operation: "checkout",
-			Message:   "branch name cannot be empty",
-		}
+		return errors.NewGitError("checkout", "branch name cannot be empty", false)
 	}
 
 	cmd := exec.Command("git", "checkout", name)
 	if err := cmd.Run(); err != nil {
-		return GitError{
-			Operation: "checkout",
-			Message:   "failed to checkout branch '" + name + "': " + err.Error(),
-		}
+		return errors.NewGitError("checkout", "failed to checkout branch '"+name+"': "+err.Error(), true)
 	}
 
 	return nil

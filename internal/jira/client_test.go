@@ -3,6 +3,8 @@ package jira
 import (
 	"errors"
 	"testing"
+
+	jiraflowErrors "jiraflow/internal/errors"
 )
 
 func TestMockClient_IsAvailable(t *testing.T) {
@@ -119,8 +121,8 @@ func TestMockClient_GetTicketTitle(t *testing.T) {
 			}
 
 			if tt.wantErr && tt.wantErrType == "JiraError" {
-				if _, ok := err.(JiraError); !ok {
-					t.Errorf("Expected JiraError, got %T", err)
+				if _, ok := err.(*JiraError); !ok {
+					t.Errorf("Expected *JiraError, got %T", err)
 				}
 			}
 		})
@@ -212,16 +214,13 @@ func TestJiraError_Error(t *testing.T) {
 			name:     "empty ticket ID",
 			ticketID: "",
 			message:  "invalid ticket ID",
-			want:     "jira error for ticket : invalid ticket ID",
+			want:     "jira error: invalid ticket ID",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := JiraError{
-				TicketID: tt.ticketID,
-				Message:  tt.message,
-			}
+			err := jiraflowErrors.NewJiraError(tt.ticketID, tt.message, true)
 
 			if got := err.Error(); got != tt.want {
 				t.Errorf("JiraError.Error() = %v, want %v", got, tt.want)

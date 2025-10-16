@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"jiraflow/internal/errors"
 )
 
 func TestValidateAndFix(t *testing.T) {
@@ -377,13 +379,9 @@ func TestValidateStrict(t *testing.T) {
 }
 
 func TestValidationError_Error(t *testing.T) {
-	err := &ValidationError{
-		Field:   "test_field",
-		Value:   "test_value",
-		Message: "test message",
-	}
+	err := errors.NewConfigError("test_field", "test_value", "test message", true)
 
-	expected := "validation error for field 'test_field' (value: test_value): test message"
+	expected := "configuration error in field 'test_field': test message"
 	if err.Error() != expected {
 		t.Errorf("ValidationError.Error() = %v, want %v", err.Error(), expected)
 	}

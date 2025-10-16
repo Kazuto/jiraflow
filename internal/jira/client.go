@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"jiraflow/internal/errors"
 )
 
 // JiraClient interface defines Jira operations
@@ -13,15 +15,8 @@ type JiraClient interface {
 	IsAvailable() bool
 }
 
-// JiraError represents a Jira operation error
-type JiraError struct {
-	TicketID string
-	Message  string
-}
-
-func (e JiraError) Error() string {
-	return "jira error for ticket " + e.TicketID + ": " + e.Message
-}
+// JiraError is an alias for the centralized JiraError type
+type JiraError = errors.JiraError
 
 // CLIClient implements JiraClient using the Jira CLI
 type CLIClient struct{}
@@ -40,10 +35,7 @@ func (c *CLIClient) IsAvailable() bool {
 // GetTicketTitle fetches the ticket title using the Jira CLI
 func (c *CLIClient) GetTicketTitle(ticketID string) (string, error) {
 	if !c.IsAvailable() {
-		return "", JiraError{
-			TicketID: ticketID,
-			Message:  "jira CLI not found - please install jira CLI or provide title manually",
-		}
+		return "", errors.NewJiraError(ticketID, "jira CLI not found - please install jira CLI or provide title manually", true)
 	}
 
 	// Execute jira view command with JSON output
@@ -54,42 +46,24 @@ func (c *CLIClient) GetTicketTitle(ticketID string) (string, error) {
 		if exitError, ok := err.(*exec.ExitError); ok {
 			stderr := string(exitError.Stderr)
 			if strings.Contains(stderr, "not found") || strings.Contains(stderr, "does not exist") {
-				return "", JiraError{
-					TicketID: ticketID,
-					Message:  fmt.Sprintf("ticket %s not found", ticketID),
-				}
+				return "", errors.NewJiraError(ticketID, fmt.Sprintf("ticket %s not found", ticketID), true)
 			}
 			if strings.Contains(stderr, "authentication") || strings.Contains(stderr, "unauthorized") {
-				return "", JiraError{
-					TicketID: ticketID,
-					Message:  "authentication failed - please run 'jira init' to configure credentials",
-				}
+				return "", errors.NewJiraError(ticketID, "authentication failed - please run 'jira init' to configure credentials", true)
 			}
-			return "", JiraError{
-				TicketID: ticketID,
-				Message:  fmt.Sprintf("failed to fetch ticket: %s", stderr),
-			}
+			return "", errors.NewJiraError(ticketID, fmt.Sprintf("failed to fetch ticket: %s", stderr), true)
 		}
-		return "", JiraError{
-			TicketID: ticketID,
-			Message:  fmt.Sprintf("failed to execute jira command: %v", err),
-		}
+		return "", errors.NewJiraError(ticketID, fmt.Sprintf("failed to execute jira command: %v", err), true)
 	}
 
 	// Parse the output to extract the title
 	title, err := c.parseTicketTitle(string(output))
 	if err != nil {
-		return "", JiraError{
-			TicketID: ticketID,
-			Message:  fmt.Sprintf("failed to parse ticket title: %v", err),
-		}
+		return "", errors.NewJiraError(ticketID, fmt.Sprintf("failed to parse ticket title: %v", err), true)
 	}
 
 	if title == "" {
-		return "", JiraError{
-			TicketID: ticketID,
-			Message:  "ticket title is empty",
-		}
+		return "", errors.NewJiraError(ticketID, "ticket title is empty", true)
 	}
 
 	return title, nil
@@ -168,18 +142,12 @@ func (m *MockClient) GetTicketTitle(ticketID string) (string, error) {
 	}
 	
 	if !m.Available {
-		return "", JiraError{
-			TicketID: ticketID,
-			Message:  "jira CLI not available",
-		}
+		return "", errors.NewJiraError(ticketID, "jira CLI not available", true)
 	}
 	
 	title, exists := m.Tickets[ticketID]
 	if !exists {
-		return "", JiraError{
-			TicketID: ticketID,
-			Message:  "ticket not found",
-		}
+		return "", errors.NewJiraError(ticketID, "ticket not found", true)
 	}
 	
 	return title, nil

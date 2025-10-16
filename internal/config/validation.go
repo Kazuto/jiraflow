@@ -3,18 +3,12 @@ package config
 import (
 	"fmt"
 	"strings"
+
+	"jiraflow/internal/errors"
 )
 
-// ValidationError represents a configuration validation error
-type ValidationError struct {
-	Field   string
-	Value   interface{}
-	Message string
-}
-
-func (e *ValidationError) Error() string {
-	return fmt.Sprintf("validation error for field '%s' (value: %v): %s", e.Field, e.Value, e.Message)
-}
+// ValidationError is an alias for the centralized ConfigError type
+type ValidationError = errors.ConfigError
 
 // ValidationResult holds the result of configuration validation
 type ValidationResult struct {
@@ -33,7 +27,7 @@ func ValidateAndFix(config *Config) *ValidationResult {
 	if config == nil {
 		return &ValidationResult{
 			Errors: []ValidationError{
-				{Field: "config", Value: nil, Message: "configuration cannot be nil"},
+				*errors.NewConfigError("config", nil, "configuration cannot be nil", false),
 			},
 		}
 	}
@@ -63,11 +57,7 @@ func ValidateAndFix(config *Config) *ValidationResult {
 		// Check for empty keys or values in branch_types
 		for key, value := range config.BranchTypes {
 			if key == "" {
-				result.Errors = append(result.Errors, ValidationError{
-					Field:   "branch_types",
-					Value:   key,
-					Message: "branch type key cannot be empty",
-				})
+				result.Errors = append(result.Errors, *errors.NewConfigError("branch_types", key, "branch type key cannot be empty", false))
 			}
 			if value == "" {
 				result.Warnings = append(result.Warnings,
@@ -137,82 +127,46 @@ func ValidateStrict(config *Config) error {
 
 	// Validate max_branch_length
 	if config.MaxBranchLength < 10 || config.MaxBranchLength > 200 {
-		return &ValidationError{
-			Field:   "max_branch_length",
-			Value:   config.MaxBranchLength,
-			Message: "must be between 10 and 200",
-		}
+		return errors.NewConfigError("max_branch_length", config.MaxBranchLength, "must be between 10 and 200", true)
 	}
 
 	// Validate branch_types
 	if len(config.BranchTypes) == 0 {
-		return &ValidationError{
-			Field:   "branch_types",
-			Value:   config.BranchTypes,
-			Message: "cannot be empty",
-		}
+		return errors.NewConfigError("branch_types", config.BranchTypes, "cannot be empty", true)
 	}
 
 	for key, value := range config.BranchTypes {
 		if key == "" {
-			return &ValidationError{
-				Field:   "branch_types",
-				Value:   key,
-				Message: "branch type key cannot be empty",
-			}
+			return errors.NewConfigError("branch_types", key, "branch type key cannot be empty", false)
 		}
 		if value == "" {
-			return &ValidationError{
-				Field:   "branch_types",
-				Value:   fmt.Sprintf("key '%s'", key),
-				Message: "branch type value cannot be empty",
-			}
+			return errors.NewConfigError("branch_types", fmt.Sprintf("key '%s'", key), "branch type value cannot be empty", true)
 		}
 	}
 
 	// Validate default_branch_type
 	if config.DefaultBranchType == "" {
-		return &ValidationError{
-			Field:   "default_branch_type",
-			Value:   config.DefaultBranchType,
-			Message: "cannot be empty",
-		}
+		return errors.NewConfigError("default_branch_type", config.DefaultBranchType, "cannot be empty", true)
 	}
 
 	if _, exists := config.BranchTypes[config.DefaultBranchType]; !exists {
-		return &ValidationError{
-			Field:   "default_branch_type",
-			Value:   config.DefaultBranchType,
-			Message: "must exist in branch_types",
-		}
+		return errors.NewConfigError("default_branch_type", config.DefaultBranchType, "must exist in branch_types", true)
 	}
 
 	// Validate sanitization settings
 	if config.Sanitization.Separator == "" {
-		return &ValidationError{
-			Field:   "sanitization.separator",
-			Value:   config.Sanitization.Separator,
-			Message: "cannot be empty",
-		}
+		return errors.NewConfigError("sanitization.separator", config.Sanitization.Separator, "cannot be empty", true)
 	}
 
 	if len(config.Sanitization.Separator) > 5 {
-		return &ValidationError{
-			Field:   "sanitization.separator",
-			Value:   config.Sanitization.Separator,
-			Message: "cannot be longer than 5 characters",
-		}
+		return errors.NewConfigError("sanitization.separator", config.Sanitization.Separator, "cannot be longer than 5 characters", true)
 	}
 
 	// Check for problematic characters in separator
 	problematicChars := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|", " "}
 	for _, char := range problematicChars {
 		if strings.Contains(config.Sanitization.Separator, char) {
-			return &ValidationError{
-				Field:   "sanitization.separator",
-				Value:   config.Sanitization.Separator,
-				Message: fmt.Sprintf("cannot contain problematic character '%s'", char),
-			}
+			return errors.NewConfigError("sanitization.separator", config.Sanitization.Separator, fmt.Sprintf("cannot contain problematic character '%s'", char), true)
 		}
 	}
 

@@ -270,7 +270,7 @@ branch_types:
 			},
 			expectError: true,
 			errorCheck: func(err error) bool {
-				return strings.Contains(err.Error(), "failed to parse configuration file")
+				return strings.Contains(err.Error(), "failed to parse YAML configuration")
 			},
 		},
 		{
@@ -294,7 +294,7 @@ sanitization:
 			},
 			expectError: true,
 			errorCheck: func(err error) bool {
-				return strings.Contains(err.Error(), "configuration validation failed")
+				return strings.Contains(err.Error(), "branch type key cannot be empty")
 			},
 		},
 	}
