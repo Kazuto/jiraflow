@@ -177,11 +177,12 @@ func (result BranchSearchResult) GetSearchSummary() string {
 	}
 	
 	count := len(result.Branches)
-	if count == 0 {
+	switch count {
+	case 0:
 		return result.GetEmptySearchMessage()
-	} else if count == 1 {
+	case 1:
 		return "1 branch found"
-	} else {
+	default:
 		return fmt.Sprintf("%d branches found", count)
 	}
 }

@@ -60,7 +60,7 @@ func (d BranchItemDelegate) Render(w io.Writer, m list.Model, index int, listIte
 		}
 	}
 
-	fmt.Fprint(w, fn(str))
+	_, _ = fmt.Fprint(w, fn(str))
 }
 
 // BranchSelectorModel handles branch selection with search functionality
@@ -376,7 +376,7 @@ func (m BranchSelectorModel) renderHelp() string {
 	}
 	
 	if len(contextHelp) > 0 {
-		contextStyle := components.HelpStyle.Copy().
+		contextStyle := components.HelpStyle.
 			Foreground(components.ColorMuted).
 			Faint(true)
 		sections = append(sections, contextStyle.Render(strings.Join(contextHelp, " • ")))

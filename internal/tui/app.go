@@ -649,30 +649,6 @@ func (m AppModel) getContextInfo() []string {
 	return info
 }
 
-// getGlobalHelpText returns help text for globally available shortcuts (legacy method)
-func (m AppModel) getGlobalHelpText() string {
-	var globalKeys []string
-	
-	// Always available shortcuts
-	globalKeys = append(globalKeys, "q quit")
-	globalKeys = append(globalKeys, "ctrl+c force quit")
-	
-	// Add state-specific global shortcuts
-	switch m.state {
-	case StateTypeSelection:
-		// No additional global shortcuts for first screen
-	default:
-		// All other screens can go back
-		if m.state != StateComplete {
-			// Don't show esc for complete screen as it's handled differently
-			if m.state == StateConfirmation {
-				globalKeys = append(globalKeys, "esc back")
-			}
-		}
-	}
-	
-	return "Global: " + strings.Join(globalKeys, " • ")
-}
 
 // renderError renders error messages using the error handler
 func (m AppModel) renderError() string {
@@ -809,52 +785,3 @@ func (m AppModel) createBranch() error {
 	return m.git.CreateBranch(m.finalBranch, m.selectedBranch)
 }
 
-// handleGracefulDegradation handles errors gracefully and provides fallback options
-func (m *AppModel) handleGracefulDegradation(err error) {
-	if err == nil {
-		return
-	}
-
-	// Handle different types of errors with graceful degradation
-	if jfErr, ok := err.(errors.JiraFlowError); ok {
-		switch jfErr.Type() {
-		case errors.ErrorTypeJira:
-			// Jira integration failed - continue with manual title entry
-			// This is already handled in the input form model
-			return
-		case errors.ErrorTypeGit:
-			// Git operations failed - this is more serious
-			if !jfErr.IsRecoverable() {
-				m.SetError(err)
-				return
-			}
-			// For recoverable Git errors, show warning but continue
-			return
-		case errors.ErrorTypeConfig:
-			// Config issues - use defaults and continue
-			if jfErr.IsRecoverable() {
-				// Configuration will fall back to defaults
-				return
-			}
-			m.SetError(err)
-			return
-		}
-	}
-
-	// For other errors, set error state
-	m.SetError(err)
-}
-
-// showDegradationWarning displays a warning about degraded functionality
-func (m AppModel) showDegradationWarning(warningType errors.ErrorType) string {
-	switch warningType {
-	case errors.ErrorTypeJira:
-		return m.errorHandler.FormatWarningForTUI("Jira integration unavailable - you can enter ticket titles manually")
-	case errors.ErrorTypeGit:
-		return m.errorHandler.FormatWarningForTUI("Some Git features may be limited")
-	case errors.ErrorTypeConfig:
-		return m.errorHandler.FormatWarningForTUI("Using default configuration values")
-	default:
-		return m.errorHandler.FormatWarningForTUI("Some features may be limited")
-	}
-}

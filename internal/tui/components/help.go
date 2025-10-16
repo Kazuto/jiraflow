@@ -57,7 +57,7 @@ func (h *HelpRenderer) RenderKeyBindings(bindings []KeyBinding) string {
 	// Render global bindings
 	if len(globalBindings) > 0 {
 		globalHelp := h.renderBindingList(globalBindings)
-		globalStyle := HelpStyle.Copy().
+		globalStyle := HelpStyle.
 			Foreground(ColorMuted).
 			Faint(true)
 		sections = append(sections, globalStyle.Render("Global: "+globalHelp))
@@ -126,7 +126,7 @@ func (h *HelpRenderer) RenderContextualHelp(mainHelp string, contextInfo []strin
 	// Context information
 	if len(contextInfo) > 0 {
 		contextText := strings.Join(contextInfo, " • ")
-		contextStyle := HelpStyle.Copy().
+		contextStyle := HelpStyle.
 			Foreground(ColorMuted).
 			Faint(true)
 		sections = append(sections, contextStyle.Render(contextText))

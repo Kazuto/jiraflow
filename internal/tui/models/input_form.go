@@ -472,7 +472,7 @@ func (m InputFormModel) renderHelp() string {
 		contextHelp = append(contextHelp, "Jira unavailable")
 	}
 	
-	contextStyle := components.HelpStyle.Copy().
+	contextStyle := components.HelpStyle.
 		Foreground(components.ColorMuted).
 		Faint(true)
 	sections = append(sections, contextStyle.Render(strings.Join(contextHelp, " • ")))

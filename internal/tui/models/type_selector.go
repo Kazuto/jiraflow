@@ -71,13 +71,13 @@ func (d TypeItemDelegate) Render(w io.Writer, m list.Model, index int, listItem 
 			return components.ListSelectedItemStyle.Render("> " + strings.Join(s, " "))
 		}
 		descFn = func(s ...string) string {
-			return components.ListSelectedItemStyle.Copy().
+			return components.ListSelectedItemStyle.
 				Faint(true).
 				Render("  " + strings.Join(s, " "))
 		}
 	}
 
-	fmt.Fprintf(w, "%s\n%s", fn(str), descFn(desc))
+	_, _ = fmt.Fprintf(w, "%s\n%s", fn(str), descFn(desc))
 }
 
 // TypeSelectorModel handles branch type selection
@@ -255,7 +255,7 @@ func (m TypeSelectorModel) renderHelp() string {
 	}
 	contextHelp = append(contextHelp, fmt.Sprintf("%d types available", len(m.types)))
 	
-	contextStyle := components.HelpStyle.Copy().
+	contextStyle := components.HelpStyle.
 		Foreground(components.ColorMuted).
 		Faint(true)
 	sections = append(sections, contextStyle.Render(strings.Join(contextHelp, " • ")))

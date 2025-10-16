@@ -152,7 +152,7 @@ func TestFileConfigManager_CreateDefault_Scenarios(t *testing.T) {
 			setupFunc: func() string {
 				tempDir := t.TempDir()
 				configDir := filepath.Join(tempDir, ".config", "jiraflow")
-				os.MkdirAll(configDir, 0755)
+				_ = os.MkdirAll(configDir, 0750)
 				return filepath.Join(configDir, "jiraflow.yaml")
 			},
 			expectError: false,
@@ -163,7 +163,7 @@ func TestFileConfigManager_CreateDefault_Scenarios(t *testing.T) {
 				tempDir := t.TempDir()
 				configPath := filepath.Join(tempDir, ".config", "jiraflow", "jiraflow.yaml")
 				manager := &FileConfigManager{configPath: configPath}
-				manager.CreateDefault() // Create it first
+				_ = manager.CreateDefault() // Create it first
 				return configPath
 			},
 			expectError: false, // Should overwrite existing file
@@ -173,7 +173,7 @@ func TestFileConfigManager_CreateDefault_Scenarios(t *testing.T) {
 			setupFunc: func() string {
 				tempDir := t.TempDir()
 				readOnlyDir := filepath.Join(tempDir, "readonly")
-				os.MkdirAll(readOnlyDir, 0444) // Read-only permissions
+				_ = os.MkdirAll(readOnlyDir, 0444) //nolint:gosec // Read-only permissions intentional for testing
 				return filepath.Join(readOnlyDir, ".config", "jiraflow", "jiraflow.yaml")
 			},
 			expectError: true,
@@ -239,7 +239,7 @@ func TestFileConfigManager_Load_ErrorHandling(t *testing.T) {
 				tempDir := t.TempDir()
 				configPath := filepath.Join(tempDir, "jiraflow.yaml")
 				manager := &FileConfigManager{configPath: configPath}
-				manager.CreateDefault()
+				_ = manager.CreateDefault()
 				return manager
 			},
 			expectError: false,
@@ -265,7 +265,7 @@ max_branch_length: not_a_number
 branch_types:
   - invalid: structure
 `
-				os.WriteFile(configPath, []byte(invalidYAML), 0644)
+				_ = os.WriteFile(configPath, []byte(invalidYAML), 0600)
 				return &FileConfigManager{configPath: configPath}
 			},
 			expectError: true,
@@ -289,7 +289,7 @@ branch_types:
 sanitization:
   separator: "-"
 `
-				os.WriteFile(configPath, []byte(invalidConfig), 0644)
+				_ = os.WriteFile(configPath, []byte(invalidConfig), 0600)
 				return &FileConfigManager{configPath: configPath}
 			},
 			expectError: true,
@@ -393,7 +393,7 @@ sanitization:
 			configPath := filepath.Join(tempDir, "jiraflow.yaml")
 			
 			// Write test config
-			err := os.WriteFile(configPath, []byte(tt.configContent), 0644)
+			err := os.WriteFile(configPath, []byte(tt.configContent), 0600)
 			if err != nil {
 				t.Fatalf("Failed to write test config: %v", err)
 			}

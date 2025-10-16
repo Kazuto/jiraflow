@@ -220,8 +220,8 @@ func TestInputFormModel_TextInput(t *testing.T) {
 	model.currentField = FieldTicketNumber
 	
 	// Type "JIRA-123"
-	chars := []rune("JIRA-123")
-	for _, char := range chars {
+	text := "JIRA-123"
+	for _, char := range text {
 		charMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{char}}
 		model, _ = model.Update(charMsg)
 	}

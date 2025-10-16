@@ -84,7 +84,7 @@ func (m ConfirmationModel) View() string {
 	
 	// Details in a styled box
 	details := m.renderDetails()
-	detailsBox := components.BorderStyle.Copy().
+	detailsBox := components.BorderStyle.
 		Width(m.width - 8).
 		Render(details)
 	sections = append(sections, detailsBox)
@@ -188,7 +188,7 @@ func (m ConfirmationModel) renderHelp() string {
 		"Branch will be created and checked out",
 	}
 	
-	contextStyle := components.HelpStyle.Copy().
+	contextStyle := components.HelpStyle.
 		Foreground(components.ColorMuted).
 		Faint(true)
 	sections = append(sections, contextStyle.Render(strings.Join(contextHelp, " • ")))

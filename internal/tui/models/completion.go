@@ -105,7 +105,7 @@ func (m CompletionModel) renderSuccess() []string {
 		Bold(true).
 		Render("✅")
 	
-	title := components.TitleStyle.Copy().
+	title := components.TitleStyle.
 		Foreground(components.ColorSuccess).
 		Render("Branch Created Successfully!")
 	
@@ -163,7 +163,7 @@ func (m CompletionModel) renderError() []string {
 		Bold(true).
 		Render("❌")
 	
-	title := components.TitleStyle.Copy().
+	title := components.TitleStyle.
 		Foreground(components.ColorError).
 		Render("Branch Creation Failed")
 	
@@ -303,7 +303,7 @@ func (m CompletionModel) renderSuccessHelp() string {
 		"Ready to start development",
 	}
 	
-	contextStyle := components.HelpStyle.Copy().
+	contextStyle := components.HelpStyle.
 		Foreground(components.ColorMuted).
 		Faint(true)
 	sections = append(sections, contextStyle.Render(strings.Join(contextHelp, " • ")))
@@ -330,7 +330,7 @@ func (m CompletionModel) renderErrorHelp() string {
 		"Check troubleshooting tips above",
 	}
 	
-	contextStyle := components.HelpStyle.Copy().
+	contextStyle := components.HelpStyle.
 		Foreground(components.ColorMuted).
 		Faint(true)
 	sections = append(sections, contextStyle.Render(strings.Join(contextHelp, " • ")))

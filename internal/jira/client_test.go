@@ -240,6 +240,7 @@ func TestNewMockClient(t *testing.T) {
 	client := NewMockClient()
 	if client == nil {
 		t.Error("NewMockClient() returned nil")
+		return
 	}
 
 	// Test default state
