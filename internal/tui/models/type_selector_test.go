@@ -155,6 +155,224 @@ func TestTypeSelectorModel_GetSelectedDisplayName(t *testing.T) {
 	}
 }
 
+func TestTypeSelectorModel_KeyboardNavigation(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	model := NewTypeSelectorModel(cfg)
+
+	// Test vim-style navigation (j/k keys)
+	jMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")}
+	updatedModel, _ := model.Update(jMsg)
+
+	// Should not crash and maintain valid state
+	if len(updatedModel.types) != 4 {
+		t.Error("Navigation should not affect available types")
+	}
+
+	kMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")}
+	updatedModel, _ = updatedModel.Update(kMsg)
+
+	if len(updatedModel.types) != 4 {
+		t.Error("Navigation should not affect available types")
+	}
+
+	// Test arrow key navigation
+	upMsg := tea.KeyMsg{Type: tea.KeyUp}
+	downMsg := tea.KeyMsg{Type: tea.KeyDown}
+
+	updatedModel, _ = model.Update(downMsg)
+	if len(updatedModel.types) != 4 {
+		t.Error("Arrow navigation should not affect available types")
+	}
+
+	updatedModel, _ = updatedModel.Update(upMsg)
+	if len(updatedModel.types) != 4 {
+		t.Error("Arrow navigation should not affect available types")
+	}
+}
+
+func TestTypeSelectorModel_SelectionHandling(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	model := NewTypeSelectorModel(cfg)
+
+	// Test initial selection state
+	if model.HasSelection() {
+		t.Error("Expected no selection initially")
+	}
+
+	// Test Enter key selection
+	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
+	updatedModel, _ := model.Update(enterMsg)
+
+	if !updatedModel.HasSelection() {
+		t.Error("Expected selection after Enter key")
+	}
+
+	selected := updatedModel.GetSelected()
+	if selected == "" {
+		t.Error("Expected non-empty selected type")
+	}
+
+	// Test that selected type is valid
+	validTypes := []string{"feature", "hotfix", "refactor", "support"}
+	isValid := false
+	for _, validType := range validTypes {
+		if selected == validType {
+			isValid = true
+			break
+		}
+	}
+	if !isValid {
+		t.Errorf("Selected type '%s' is not valid", selected)
+	}
+}
+
+func TestTypeSelectorModel_StateTransitions(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	model := NewTypeSelectorModel(cfg)
+
+	// Test navigation through all types
+	downMsg := tea.KeyMsg{Type: tea.KeyDown}
+	
+	// Navigate through all types
+	for i := 0; i < len(model.types); i++ {
+		currentItem, ok := model.GetCurrentItem()
+		if !ok {
+			t.Errorf("Expected to get current item at position %d", i)
+		}
+		
+		if currentItem.key == "" {
+			t.Errorf("Expected current item to have a key at position %d", i)
+		}
+		
+		model, _ = model.Update(downMsg)
+	}
+
+	// Test selection at different positions
+	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
+	model, _ = model.Update(enterMsg)
+
+	if !model.HasSelection() {
+		t.Error("Expected selection after navigation and Enter")
+	}
+}
+
+func TestTypeSelectorModel_BackNavigation(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	model := NewTypeSelectorModel(cfg)
+
+	// Test Esc key (back navigation)
+	escMsg := tea.KeyMsg{Type: tea.KeyEsc}
+	updatedModel, _ := model.Update(escMsg)
+
+	// Model should handle back navigation gracefully
+	// (The actual behavior depends on parent component handling)
+	if len(updatedModel.types) != 4 {
+		t.Error("Back navigation should not affect available types")
+	}
+}
+
+func TestTypeSelectorModel_WindowSizeHandling(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	model := NewTypeSelectorModel(cfg)
+
+	// Test window size update
+	sizeMsg := tea.WindowSizeMsg{Width: 100, Height: 30}
+	updatedModel, _ := model.Update(sizeMsg)
+
+	if updatedModel.width != 100 {
+		t.Errorf("Expected width to be 100, got %d", updatedModel.width)
+	}
+
+	if updatedModel.height != 30 {
+		t.Errorf("Expected height to be 30, got %d", updatedModel.height)
+	}
+}
+
+func TestTypeSelectorModel_GetAvailableTypes(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	model := NewTypeSelectorModel(cfg)
+
+	availableTypes := model.GetAvailableTypes()
+	if len(availableTypes) != 4 {
+		t.Errorf("Expected 4 available types, got %d", len(availableTypes))
+	}
+
+	// Test that all types have required fields
+	for i, typeItem := range availableTypes {
+		if typeItem.key == "" {
+			t.Errorf("Type at index %d has empty key", i)
+		}
+		if typeItem.displayName == "" {
+			t.Errorf("Type at index %d has empty display name", i)
+		}
+		if typeItem.description == "" {
+			t.Errorf("Type at index %d has empty description", i)
+		}
+	}
+}
+
+func TestTypeSelectorModel_DefaultTypeHandling(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	model := NewTypeSelectorModel(cfg)
+
+	// Test that exactly one type is marked as default
+	defaultCount := 0
+	var defaultType TypeItem
+	for _, typeItem := range model.types {
+		if typeItem.isDefault {
+			defaultCount++
+			defaultType = typeItem
+		}
+	}
+
+	if defaultCount != 1 {
+		t.Errorf("Expected exactly 1 default type, got %d", defaultCount)
+	}
+
+	if defaultType.key != cfg.DefaultBranchType {
+		t.Errorf("Expected default type to be '%s', got '%s'", cfg.DefaultBranchType, defaultType.key)
+	}
+
+	// Test that initial selection is the default type
+	currentItem, ok := model.GetCurrentItem()
+	if !ok {
+		t.Error("Expected to get current item initially")
+	}
+
+	if !currentItem.isDefault {
+		t.Error("Expected initial current item to be the default type")
+	}
+}
+
+func TestTypeSelectorModel_ViewRendering(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	model := NewTypeSelectorModel(cfg)
+
+	// Test basic view rendering
+	view := model.View()
+	if view == "" {
+		t.Error("Expected non-empty view")
+	}
+
+	// Test view after navigation
+	downMsg := tea.KeyMsg{Type: tea.KeyDown}
+	model, _ = model.Update(downMsg)
+	
+	viewAfterNav := model.View()
+	if viewAfterNav == "" {
+		t.Error("Expected non-empty view after navigation")
+	}
+
+	// Test view after selection
+	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
+	model, _ = model.Update(enterMsg)
+	
+	viewAfterSelection := model.View()
+	if viewAfterSelection == "" {
+		t.Error("Expected non-empty view after selection")
+	}
+}
+
 func TestTypeItem_Methods(t *testing.T) {
 	item := TypeItem{
 		key:         "feature",
