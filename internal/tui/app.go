@@ -99,11 +99,15 @@ func NewAppModel(cfg *config.Config, gitRepo git.GitRepository) *AppModel {
 		branchModel = models.NewBranchSelectorModel([]git.BranchInfo{})
 	}
 	
+	// Initialize input form model (Jira client will be set later if available)
+	inputModel := models.NewInputFormModel(nil)
+	
 	return &AppModel{
 		state:       StateTypeSelection,
 		config:      cfg,
 		git:         gitRepo,
 		branchModel: branchModel,
+		inputModel:  inputModel,
 	}
 }
 
@@ -133,8 +137,9 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		
-		// Update branch selector size
+		// Update component sizes
 		m.branchModel.SetSize(msg.Width, msg.Height-6) // Leave space for header/footer
+		m.inputModel.SetSize(msg.Width, msg.Height-6)
 		
 		return m, nil
 
@@ -176,9 +181,9 @@ func (m AppModel) handleBack() (tea.Model, tea.Cmd) {
 	case StateTicketInput:
 		m.state = StateBranchSelection
 	case StateTitleInput:
-		m.state = StateTicketInput
+		m.state = StateBranchSelection // Skip back to branch selection since title is in ticket form
 	case StateConfirmation:
-		m.state = StateTitleInput
+		m.state = StateTicketInput
 	case StateComplete:
 		m.state = StateConfirmation
 	}
@@ -218,20 +223,32 @@ func (m AppModel) updateBranchSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m AppModel) updateTicketInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Placeholder - will be implemented in task 4.4
-	if key.Matches(msg, keys.Enter) {
-		m.ticketNumber = "JIRA-123" // Default for now
-		m.state = StateTitleInput
+	var cmd tea.Cmd
+	
+	// Update the input form model
+	m.inputModel, cmd = m.inputModel.Update(msg)
+	
+	// Check if form was completed
+	if m.inputModel.HasCompleted() {
+		m.ticketNumber = m.inputModel.GetTicketNumber()
+		m.ticketTitle = m.inputModel.GetTicketTitle()
+		m.state = StateConfirmation // Skip title input since it's handled in the form
+		return m, cmd
 	}
-	return m, nil
+	
+	// Handle back navigation
+	if key.Matches(msg, keys.Back) {
+		m.state = StateBranchSelection
+		return m, cmd
+	}
+	
+	return m, cmd
 }
 
 func (m AppModel) updateTitleInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Placeholder - will be implemented in task 4.4
-	if key.Matches(msg, keys.Enter) {
-		m.ticketTitle = "Sample Title" // Default for now
-		m.state = StateConfirmation
-	}
+	// This state is now handled within the ticket input form
+	// Redirect to confirmation if we somehow end up here
+	m.state = StateConfirmation
 	return m, nil
 }
 
@@ -300,11 +317,11 @@ func (m AppModel) renderHeader() string {
 	case StateBranchSelection:
 		stateText = "Step 2/5: Select Base Branch"
 	case StateTicketInput:
-		stateText = "Step 3/5: Enter Ticket Number"
+		stateText = "Step 3/4: Enter Ticket Information"
 	case StateTitleInput:
-		stateText = "Step 4/5: Enter Title"
+		stateText = "Step 3/4: Enter Ticket Information"
 	case StateConfirmation:
-		stateText = "Step 5/5: Confirm Branch Creation"
+		stateText = "Step 4/4: Confirm Branch Creation"
 	case StateComplete:
 		stateText = "Complete!"
 	}
@@ -369,22 +386,26 @@ func (m AppModel) renderBranchSelection() string {
 }
 
 func (m AppModel) renderTicketInput() string {
-	content := fmt.Sprintf("Selected type: %s\n", components.SelectedStyle.Render(m.selectedType))
-	content += fmt.Sprintf("Selected branch: %s\n\n", components.SelectedStyle.Render(m.selectedBranch))
-	content += "Enter ticket number (e.g., JIRA-123):\n\n"
-	content += "→ [input field placeholder]\n"
+	var sections []string
 	
-	return content
+	// Show selected type and branch
+	selectedType := fmt.Sprintf("Selected type: %s", components.SelectedStyle.Render(m.selectedType))
+	selectedBranch := fmt.Sprintf("Selected branch: %s", components.SelectedStyle.Render(m.selectedBranch))
+	sections = append(sections, selectedType)
+	sections = append(sections, selectedBranch)
+	sections = append(sections, "")
+	
+	// Render the input form
+	inputView := m.inputModel.View()
+	sections = append(sections, inputView)
+	
+	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }
 
 func (m AppModel) renderTitleInput() string {
-	content := fmt.Sprintf("Selected type: %s\n", components.SelectedStyle.Render(m.selectedType))
-	content += fmt.Sprintf("Selected branch: %s\n", components.SelectedStyle.Render(m.selectedBranch))
-	content += fmt.Sprintf("Ticket number: %s\n\n", components.SelectedStyle.Render(m.ticketNumber))
-	content += "Enter title (optional):\n\n"
-	content += "→ [input field placeholder]\n"
-	
-	return content
+	// Title input is now handled within the ticket input form
+	// This should not be reached, but provide fallback
+	return m.renderTicketInput()
 }
 
 func (m AppModel) renderConfirmation() string {
