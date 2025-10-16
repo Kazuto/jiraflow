@@ -29,9 +29,17 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
         restore-keys: |
+          ${{ runner.os }}-go-${{ matrix.go-version }}-
           ${{ runner.os }}-go-
+      continue-on-error: true
+    
+    - name: Clean Go module cache on restore failure
+      if: failure()
+      run: |
+        rm -rf ~/go/pkg/mod
+        go clean -modcache
     
     - name: Install dependencies
       run: go mod download
@@ -112,8 +120,28 @@ jobs:
       with:
         go-version: 1.23
     
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: binaries
+        path: dist/
+    
     - name: Create release archives
-      run: make release
+      run: |
+        mkdir -p dist/archives
+        VERSION=$(git describe --tags --always --dirty)
+        
+        # Create tar.gz for Unix systems
+        cd dist && tar -czf archives/jiraflow-${VERSION}-linux-amd64.tar.gz jiraflow-linux-amd64
+        cd dist && tar -czf archives/jiraflow-${VERSION}-linux-arm64.tar.gz jiraflow-linux-arm64
+        cd dist && tar -czf archives/jiraflow-${VERSION}-darwin-amd64.tar.gz jiraflow-darwin-amd64
+        cd dist && tar -czf archives/jiraflow-${VERSION}-darwin-arm64.tar.gz jiraflow-darwin-arm64
+        
+        # Create zip for Windows
+        cd dist && zip archives/jiraflow-${VERSION}-windows-amd64.zip jiraflow-windows-amd64.exe
+        
+        echo "Release archives created in dist/archives/"
+        ls -la dist/archives/
     
     - name: Upload release assets
       uses: softprops/action-gh-release@v2
