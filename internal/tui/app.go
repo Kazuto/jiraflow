@@ -1,7 +1,17 @@
 package tui
 
 import (
+	"fmt"
+	"strings"
+
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+
+	"jiraflow/internal/config"
+	"jiraflow/internal/git"
+	"jiraflow/internal/tui/components"
+	"jiraflow/internal/tui/models"
 )
 
 // AppState represents the current state of the TUI application
@@ -18,21 +28,386 @@ const (
 
 // AppModel represents the main TUI application model
 type AppModel struct {
-	state AppState
-	err   error
+	state       AppState
+	config      *config.Config
+	git         git.GitRepository
+	typeModel   models.TypeSelectorModel
+	branchModel models.BranchSelectorModel
+	inputModel  models.InputFormModel
+	err         error
+	width       int
+	height      int
+	
+	// State data
+	selectedType   string
+	selectedBranch string
+	ticketNumber   string
+	ticketTitle    string
+	finalBranch    string
+}
+
+// keyMap defines the key bindings for the application
+type keyMap struct {
+	Up     key.Binding
+	Down   key.Binding
+	Enter  key.Binding
+	Back   key.Binding
+	Quit   key.Binding
+	Search key.Binding
+}
+
+// DefaultKeyMap returns the default key bindings
+func DefaultKeyMap() keyMap {
+	return keyMap{
+		Up: key.NewBinding(
+			key.WithKeys("up", "k"),
+			key.WithHelp("↑/k", "move up"),
+		),
+		Down: key.NewBinding(
+			key.WithKeys("down", "j"),
+			key.WithHelp("↓/j", "move down"),
+		),
+		Enter: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("enter", "select"),
+		),
+		Back: key.NewBinding(
+			key.WithKeys("esc"),
+			key.WithHelp("esc", "back"),
+		),
+		Quit: key.NewBinding(
+			key.WithKeys("q", "ctrl+c"),
+			key.WithHelp("q", "quit"),
+		),
+		Search: key.NewBinding(
+			key.WithKeys("/"),
+			key.WithHelp("/", "search"),
+		),
+	}
+}
+
+var keys = DefaultKeyMap()
+
+// NewAppModel creates a new AppModel instance
+func NewAppModel(cfg *config.Config, gitRepo git.GitRepository) *AppModel {
+	return &AppModel{
+		state:  StateTypeSelection,
+		config: cfg,
+		git:    gitRepo,
+	}
+}
+
+// RunTUI starts the TUI application
+func RunTUI(cfg *config.Config, gitRepo git.GitRepository) error {
+	model := NewAppModel(cfg, gitRepo)
+	
+	p := tea.NewProgram(
+		model,
+		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(),
+	)
+	
+	_, err := p.Run()
+	return err
 }
 
 // Init initializes the TUI application
 func (m AppModel) Init() tea.Cmd {
-	return nil
+	return tea.EnterAltScreen
 }
 
 // Update handles TUI events and state transitions
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
+
+	case tea.KeyMsg:
+		switch {
+		case key.Matches(msg, keys.Quit):
+			return m, tea.Quit
+		case key.Matches(msg, keys.Back):
+			return m.handleBack()
+		}
+
+		// Handle state-specific key events
+		switch m.state {
+		case StateTypeSelection:
+			return m.updateTypeSelection(msg)
+		case StateBranchSelection:
+			return m.updateBranchSelection(msg)
+		case StateTicketInput:
+			return m.updateTicketInput(msg)
+		case StateTitleInput:
+			return m.updateTitleInput(msg)
+		case StateConfirmation:
+			return m.updateConfirmation(msg)
+		case StateComplete:
+			return m.updateComplete(msg)
+		}
+	}
+
+	return m, nil
+}
+
+// handleBack handles the back navigation
+func (m AppModel) handleBack() (tea.Model, tea.Cmd) {
+	switch m.state {
+	case StateTypeSelection:
+		return m, tea.Quit
+	case StateBranchSelection:
+		m.state = StateTypeSelection
+	case StateTicketInput:
+		m.state = StateBranchSelection
+	case StateTitleInput:
+		m.state = StateTicketInput
+	case StateConfirmation:
+		m.state = StateTitleInput
+	case StateComplete:
+		m.state = StateConfirmation
+	}
+	return m, nil
+}
+
+// State-specific update methods (placeholder implementations)
+func (m AppModel) updateTypeSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Placeholder - will be implemented in task 4.3
+	if key.Matches(msg, keys.Enter) {
+		m.selectedType = "feature" // Default for now
+		m.state = StateBranchSelection
+	}
+	return m, nil
+}
+
+func (m AppModel) updateBranchSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Placeholder - will be implemented in task 4.2
+	if key.Matches(msg, keys.Enter) {
+		m.selectedBranch = "main" // Default for now
+		m.state = StateTicketInput
+	}
+	return m, nil
+}
+
+func (m AppModel) updateTicketInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Placeholder - will be implemented in task 4.4
+	if key.Matches(msg, keys.Enter) {
+		m.ticketNumber = "JIRA-123" // Default for now
+		m.state = StateTitleInput
+	}
+	return m, nil
+}
+
+func (m AppModel) updateTitleInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Placeholder - will be implemented in task 4.4
+	if key.Matches(msg, keys.Enter) {
+		m.ticketTitle = "Sample Title" // Default for now
+		m.state = StateConfirmation
+	}
+	return m, nil
+}
+
+func (m AppModel) updateConfirmation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Placeholder - will be implemented in task 4.5
+	if key.Matches(msg, keys.Enter) {
+		m.finalBranch = fmt.Sprintf("%s/%s-%s", m.selectedType, m.ticketNumber, "sample-title")
+		m.state = StateComplete
+	}
+	return m, nil
+}
+
+func (m AppModel) updateComplete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Placeholder - will be implemented in task 4.5
+	if key.Matches(msg, keys.Enter) {
+		return m, tea.Quit
+	}
 	return m, nil
 }
 
 // View renders the TUI interface
 func (m AppModel) View() string {
-	return "JiraFlow TUI - Coming Soon!"
+	if m.err != nil {
+		return m.renderError()
+	}
+
+	var content string
+	
+	switch m.state {
+	case StateTypeSelection:
+		content = m.renderTypeSelection()
+	case StateBranchSelection:
+		content = m.renderBranchSelection()
+	case StateTicketInput:
+		content = m.renderTicketInput()
+	case StateTitleInput:
+		content = m.renderTitleInput()
+	case StateConfirmation:
+		content = m.renderConfirmation()
+	case StateComplete:
+		content = m.renderComplete()
+	}
+
+	// Add header and footer
+	header := m.renderHeader()
+	footer := m.renderFooter()
+	
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		header,
+		"",
+		content,
+		"",
+		footer,
+	)
+}
+
+// renderHeader renders the application header
+func (m AppModel) renderHeader() string {
+	title := components.TitleStyle.Render("🚀 JiraFlow - Interactive Branch Creator")
+	
+	var stateText string
+	switch m.state {
+	case StateTypeSelection:
+		stateText = "Step 1/5: Select Branch Type"
+	case StateBranchSelection:
+		stateText = "Step 2/5: Select Base Branch"
+	case StateTicketInput:
+		stateText = "Step 3/5: Enter Ticket Number"
+	case StateTitleInput:
+		stateText = "Step 4/5: Enter Title"
+	case StateConfirmation:
+		stateText = "Step 5/5: Confirm Branch Creation"
+	case StateComplete:
+		stateText = "Complete!"
+	}
+	
+	subtitle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("241")).
+		Render(stateText)
+	
+	return lipgloss.JoinVertical(lipgloss.Left, title, subtitle)
+}
+
+// renderFooter renders the application footer with help text
+func (m AppModel) renderFooter() string {
+	var helpKeys []string
+	
+	switch m.state {
+	case StateTypeSelection:
+		helpKeys = []string{"↑/↓ navigate", "enter select", "q quit"}
+	case StateBranchSelection:
+		helpKeys = []string{"↑/↓ navigate", "/ search", "enter select", "esc back", "q quit"}
+	case StateTicketInput, StateTitleInput:
+		helpKeys = []string{"type to input", "enter continue", "esc back", "q quit"}
+	case StateConfirmation:
+		helpKeys = []string{"enter create branch", "esc back", "q quit"}
+	case StateComplete:
+		helpKeys = []string{"enter exit", "q quit"}
+	}
+	
+	help := strings.Join(helpKeys, " • ")
+	return components.HelpStyle.Render(help)
+}
+
+// renderError renders error messages
+func (m AppModel) renderError() string {
+	return components.ErrorStyle.Render("Error: " + m.err.Error())
+}
+
+// State-specific render methods (placeholder implementations)
+func (m AppModel) renderTypeSelection() string {
+	content := "Select branch type:\n\n"
+	content += "→ feature (default)\n"
+	content += "  hotfix\n"
+	content += "  refactor\n"
+	content += "  support\n"
+	
+	return content
+}
+
+func (m AppModel) renderBranchSelection() string {
+	content := fmt.Sprintf("Selected type: %s\n\n", components.SelectedStyle.Render(m.selectedType))
+	content += "Select base branch:\n\n"
+	content += "→ main\n"
+	content += "  develop\n"
+	content += "  master\n"
+	
+	return content
+}
+
+func (m AppModel) renderTicketInput() string {
+	content := fmt.Sprintf("Selected type: %s\n", components.SelectedStyle.Render(m.selectedType))
+	content += fmt.Sprintf("Selected branch: %s\n\n", components.SelectedStyle.Render(m.selectedBranch))
+	content += "Enter ticket number (e.g., JIRA-123):\n\n"
+	content += "→ [input field placeholder]\n"
+	
+	return content
+}
+
+func (m AppModel) renderTitleInput() string {
+	content := fmt.Sprintf("Selected type: %s\n", components.SelectedStyle.Render(m.selectedType))
+	content += fmt.Sprintf("Selected branch: %s\n", components.SelectedStyle.Render(m.selectedBranch))
+	content += fmt.Sprintf("Ticket number: %s\n\n", components.SelectedStyle.Render(m.ticketNumber))
+	content += "Enter title (optional):\n\n"
+	content += "→ [input field placeholder]\n"
+	
+	return content
+}
+
+func (m AppModel) renderConfirmation() string {
+	content := fmt.Sprintf("Selected type: %s\n", components.SelectedStyle.Render(m.selectedType))
+	content += fmt.Sprintf("Selected branch: %s\n", components.SelectedStyle.Render(m.selectedBranch))
+	content += fmt.Sprintf("Ticket number: %s\n", components.SelectedStyle.Render(m.ticketNumber))
+	content += fmt.Sprintf("Title: %s\n\n", components.SelectedStyle.Render(m.ticketTitle))
+	
+	content += "Branch to create:\n"
+	content += components.SelectedStyle.Render(m.finalBranch) + "\n\n"
+	content += "Press Enter to create this branch"
+	
+	return content
+}
+
+func (m AppModel) renderComplete() string {
+	content := "✅ Branch created successfully!\n\n"
+	content += fmt.Sprintf("Created: %s\n", components.SelectedStyle.Render(m.finalBranch))
+	content += fmt.Sprintf("From: %s\n\n", components.SelectedStyle.Render(m.selectedBranch))
+	content += "Press Enter to exit"
+	
+	return content
+}
+
+// Helper methods for state management
+
+// SetError sets an error state
+func (m *AppModel) SetError(err error) {
+	m.err = err
+}
+
+// ClearError clears the error state
+func (m *AppModel) ClearError() {
+	m.err = nil
+}
+
+// GetCurrentState returns the current application state
+func (m AppModel) GetCurrentState() AppState {
+	return m.state
+}
+
+// SetState sets the application state
+func (m *AppModel) SetState(state AppState) {
+	m.state = state
+}
+
+// GetSelectedData returns the currently selected data
+func (m AppModel) GetSelectedData() (string, string, string, string) {
+	return m.selectedType, m.selectedBranch, m.ticketNumber, m.ticketTitle
+}
+
+// SetSelectedData sets the selected data
+func (m *AppModel) SetSelectedData(branchType, baseBranch, ticket, title string) {
+	m.selectedType = branchType
+	m.selectedBranch = baseBranch
+	m.ticketNumber = ticket
+	m.ticketTitle = title
 }
