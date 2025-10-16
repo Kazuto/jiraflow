@@ -54,9 +54,19 @@ func (m *FileConfigManager) Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to parse configuration file %s: %w", m.configPath, err)
 	}
 
-	// Validate the loaded configuration
-	if err := m.Validate(&config); err != nil {
-		return nil, fmt.Errorf("configuration validation failed: %w", err)
+	// Validate and fix the loaded configuration
+	result := ValidateAndFix(&config)
+	if !result.IsValid() {
+		// If there are validation errors that couldn't be fixed, return the first error
+		return nil, fmt.Errorf("configuration validation failed: %s", result.Errors[0].Error())
+	}
+
+	// Log warnings if any values were fixed
+	if result.Fixed && len(result.Warnings) > 0 {
+		fmt.Fprintf(os.Stderr, "Configuration warnings (values were automatically corrected):\n")
+		for _, warning := range result.Warnings {
+			fmt.Fprintf(os.Stderr, "  - %s\n", warning)
+		}
 	}
 
 	return &config, nil
@@ -102,40 +112,7 @@ sanitization:
 	return nil
 }
 
-// Validate checks if the configuration values are valid
+// Validate checks if the configuration values are valid using strict validation
 func (m *FileConfigManager) Validate(config *Config) error {
-	if config == nil {
-		return fmt.Errorf("configuration cannot be nil")
-	}
-
-	// Validate max_branch_length
-	if config.MaxBranchLength < 10 || config.MaxBranchLength > 200 {
-		return fmt.Errorf("max_branch_length must be between 10 and 200, got %d", config.MaxBranchLength)
-	}
-
-	// Validate branch_types
-	if len(config.BranchTypes) == 0 {
-		return fmt.Errorf("branch_types cannot be empty")
-	}
-
-	for key, value := range config.BranchTypes {
-		if key == "" {
-			return fmt.Errorf("branch type key cannot be empty")
-		}
-		if value == "" {
-			return fmt.Errorf("branch type value for key '%s' cannot be empty", key)
-		}
-	}
-
-	// Validate default_branch_type exists in branch_types
-	if _, exists := config.BranchTypes[config.DefaultBranchType]; !exists {
-		return fmt.Errorf("default_branch_type '%s' must exist in branch_types", config.DefaultBranchType)
-	}
-
-	// Validate sanitization settings
-	if config.Sanitization.Separator == "" {
-		return fmt.Errorf("sanitization separator cannot be empty")
-	}
-
-	return nil
+	return ValidateStrict(config)
 }
