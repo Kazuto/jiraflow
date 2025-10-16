@@ -73,6 +73,10 @@ tmp/
 # Kiro
 .kiro/
 
+# JiraFlow specific
+jiraflow-*
+!jiraflow.example.yaml
+
 # Sourcegraph
 .sourcegraph/
 

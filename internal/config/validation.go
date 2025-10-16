@@ -1,0 +1,174 @@
+package config
+
+import (
+	"fmt"
+	"strings"
+
+	"jiraflow/internal/errors"
+)
+
+// ValidationError is an alias for the centralized ConfigError type
+type ValidationError = errors.ConfigError
+
+// ValidationResult holds the result of configuration validation
+type ValidationResult struct {
+	Errors   []ValidationError
+	Warnings []string
+	Fixed    bool // indicates if any values were fixed with defaults
+}
+
+// IsValid returns true if there are no validation errors
+func (r *ValidationResult) IsValid() bool {
+	return len(r.Errors) == 0
+}
+
+// ValidateAndFix validates the configuration and fixes invalid values with defaults
+func ValidateAndFix(config *Config) *ValidationResult {
+	if config == nil {
+		return &ValidationResult{
+			Errors: []ValidationError{
+				*errors.NewConfigError("config", nil, "configuration cannot be nil", false),
+			},
+		}
+	}
+
+	result := &ValidationResult{}
+	defaults := GetDefaultConfig()
+
+	// Validate and fix max_branch_length
+	if config.MaxBranchLength < 10 || config.MaxBranchLength > 200 {
+		result.Warnings = append(result.Warnings, 
+			fmt.Sprintf("max_branch_length %d is out of range (10-200), using default %d", 
+				config.MaxBranchLength, defaults.MaxBranchLength))
+		config.MaxBranchLength = defaults.MaxBranchLength
+		result.Fixed = true
+	}
+
+	// Validate and fix branch_types
+	if len(config.BranchTypes) == 0 {
+		result.Warnings = append(result.Warnings, 
+			"branch_types is empty, using default branch types")
+		config.BranchTypes = make(map[string]string)
+		for k, v := range defaults.BranchTypes {
+			config.BranchTypes[k] = v
+		}
+		result.Fixed = true
+	} else {
+		// Check for empty keys or values in branch_types
+		for key, value := range config.BranchTypes {
+			if key == "" {
+				result.Errors = append(result.Errors, *errors.NewConfigError("branch_types", key, "branch type key cannot be empty", false))
+			}
+			if value == "" {
+				result.Warnings = append(result.Warnings,
+					fmt.Sprintf("branch type value for key '%s' is empty, using default", key))
+				if defaultValue, exists := defaults.BranchTypes[key]; exists {
+					config.BranchTypes[key] = defaultValue
+				} else {
+					config.BranchTypes[key] = key + "/"
+				}
+				result.Fixed = true
+			}
+		}
+	}
+
+	// Validate and fix default_branch_type
+	if config.DefaultBranchType == "" {
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("default_branch_type is empty, using default '%s'", defaults.DefaultBranchType))
+		config.DefaultBranchType = defaults.DefaultBranchType
+		result.Fixed = true
+	} else if _, exists := config.BranchTypes[config.DefaultBranchType]; !exists {
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("default_branch_type '%s' does not exist in branch_types, using default '%s'", 
+				config.DefaultBranchType, defaults.DefaultBranchType))
+		config.DefaultBranchType = defaults.DefaultBranchType
+		result.Fixed = true
+	}
+
+	// Validate and fix sanitization settings
+	if config.Sanitization.Separator == "" {
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("sanitization separator is empty, using default '%s'", defaults.Sanitization.Separator))
+		config.Sanitization.Separator = defaults.Sanitization.Separator
+		result.Fixed = true
+	}
+
+	// Validate separator length (should be reasonable)
+	if len(config.Sanitization.Separator) > 5 {
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("sanitization separator '%s' is too long (>5 chars), using default '%s'", 
+				config.Sanitization.Separator, defaults.Sanitization.Separator))
+		config.Sanitization.Separator = defaults.Sanitization.Separator
+		result.Fixed = true
+	}
+
+	// Validate separator doesn't contain problematic characters
+	problematicChars := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|", " "}
+	for _, char := range problematicChars {
+		if strings.Contains(config.Sanitization.Separator, char) {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("sanitization separator '%s' contains problematic character '%s', using default '%s'", 
+					config.Sanitization.Separator, char, defaults.Sanitization.Separator))
+			config.Sanitization.Separator = defaults.Sanitization.Separator
+			result.Fixed = true
+			break
+		}
+	}
+
+	return result
+}
+
+// ValidateStrict performs strict validation without fixing values
+func ValidateStrict(config *Config) error {
+	if config == nil {
+		return fmt.Errorf("configuration cannot be nil")
+	}
+
+	// Validate max_branch_length
+	if config.MaxBranchLength < 10 || config.MaxBranchLength > 200 {
+		return errors.NewConfigError("max_branch_length", config.MaxBranchLength, "must be between 10 and 200", true)
+	}
+
+	// Validate branch_types
+	if len(config.BranchTypes) == 0 {
+		return errors.NewConfigError("branch_types", config.BranchTypes, "cannot be empty", true)
+	}
+
+	for key, value := range config.BranchTypes {
+		if key == "" {
+			return errors.NewConfigError("branch_types", key, "branch type key cannot be empty", false)
+		}
+		if value == "" {
+			return errors.NewConfigError("branch_types", fmt.Sprintf("key '%s'", key), "branch type value cannot be empty", true)
+		}
+	}
+
+	// Validate default_branch_type
+	if config.DefaultBranchType == "" {
+		return errors.NewConfigError("default_branch_type", config.DefaultBranchType, "cannot be empty", true)
+	}
+
+	if _, exists := config.BranchTypes[config.DefaultBranchType]; !exists {
+		return errors.NewConfigError("default_branch_type", config.DefaultBranchType, "must exist in branch_types", true)
+	}
+
+	// Validate sanitization settings
+	if config.Sanitization.Separator == "" {
+		return errors.NewConfigError("sanitization.separator", config.Sanitization.Separator, "cannot be empty", true)
+	}
+
+	if len(config.Sanitization.Separator) > 5 {
+		return errors.NewConfigError("sanitization.separator", config.Sanitization.Separator, "cannot be longer than 5 characters", true)
+	}
+
+	// Check for problematic characters in separator
+	problematicChars := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|", " "}
+	for _, char := range problematicChars {
+		if strings.Contains(config.Sanitization.Separator, char) {
+			return errors.NewConfigError("sanitization.separator", config.Sanitization.Separator, fmt.Sprintf("cannot contain problematic character '%s'", char), true)
+		}
+	}
+
+	return nil
+}

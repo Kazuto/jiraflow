@@ -19,74 +19,252 @@ A CLI tool that creates GitFlow-compliant git branches from Jira ticket informat
 - **Git** - for branch creation
 - **[Jira CLI](https://github.com/ankitpokhrel/jira-cli)** (optional) - required only if you want to automatically fetch ticket titles from Jira
 
-### Installing Jira CLI
+### Installing Jira CLI (Optional)
 
-Follow the installation instructions at [github.com/ankitpokhrel/jira-cli](https://github.com/ankitpokhrel/jira-cli#installation).
+JiraFlow can automatically fetch ticket titles from Jira using the [Jira CLI](https://github.com/ankitpokhrel/jira-cli). This is optional - you can always enter titles manually.
 
-After installation, configure Jira CLI:
+#### Install Jira CLI
+```bash
+# macOS
+brew install ankitpokhrel/jira-cli/jira-cli
 
+# Linux/Windows - see https://github.com/ankitpokhrel/jira-cli#installation
+```
+
+#### Configure Jira CLI
 ```bash
 jira init
 ```
 
-This will prompt you for your Jira server URL, email, and API token. Once configured, JiraFlow will use Jira CLI to fetch ticket information.
+This will prompt you for:
+- Jira server URL (e.g., `https://yourcompany.atlassian.net`)
+- Email address
+- API token (create at: Account Settings → Security → API tokens)
+
+Once configured, JiraFlow will automatically fetch ticket titles when you provide just the ticket number.
 
 ## Installation
 
-### Using Go Install
+### Prerequisites
 
+- **Go 1.21 or later** - Required for building from source
+- **Git** - Required for branch operations
+- **[Jira CLI](https://github.com/ankitpokhrel/jira-cli)** (optional) - For automatic ticket title fetching
+
+### Quick Install (Recommended)
+
+#### Using Go Install
 ```bash
 go install github.com/kazuto/jiraflow@latest
 ```
 
-### From Source
+#### Using Homebrew (macOS/Linux)
+```bash
+# Coming soon
+brew install jiraflow
+```
 
+### Build from Source
+
+#### 1. Clone the Repository
 ```bash
 git clone https://github.com/kazuto/jiraflow.git
 cd jiraflow
-go build -o jiraflow
-sudo mv jiraflow /usr/local/bin/
 ```
+
+#### 2. Install Dependencies
+```bash
+go mod download
+```
+
+#### 3. Build the Binary
+```bash
+# Using Make (recommended)
+make build
+
+# Or build manually
+go build -o jiraflow
+
+# Build with version info
+make build  # Automatically includes version info
+
+# Build for all platforms
+make build-all
+```
+
+#### 4. Install System-wide (Optional)
+```bash
+# macOS/Linux
+sudo mv jiraflow /usr/local/bin/
+
+# Or add to your PATH
+mkdir -p ~/bin
+mv jiraflow ~/bin/
+export PATH="$HOME/bin:$PATH"  # Add to your shell profile
+```
+
+### Development Setup
+
+#### 1. Clone and Setup
+```bash
+git clone https://github.com/kazuto/jiraflow.git
+cd jiraflow
+go mod download
+
+# Set up development environment (installs linters, etc.)
+make dev-setup
+```
+
+#### 2. Run Tests
+```bash
+# Using Make (recommended)
+make test
+
+# Run with coverage report
+make test-coverage
+
+# Or run manually
+go test ./...
+go test -cover ./...
+go test -v ./...
+
+# Run specific package tests
+go test ./internal/config
+```
+
+#### 3. Run Development Build
+```bash
+# Run without building
+go run main.go
+
+# Run with flags
+go run main.go --type feature --ticket PROJ-123
+```
+
+#### 4. Build Development Binary
+```bash
+# Using Make
+make build
+
+# Quick build for testing
+go build -o jiraflow-dev
+
+# Build with race detection (for testing)
+go build -race -o jiraflow-dev
+```
+
+#### 5. Available Make Commands
+```bash
+# See all available commands
+make help
+
+# Common development commands
+make dev-setup    # Set up development environment
+make test         # Run tests
+make lint         # Run code linter
+make fmt          # Format code
+make clean        # Clean build artifacts
+make release      # Create release archives
+```
+
+#### 6. Continuous Integration
+
+The project includes GitHub Actions workflows for:
+- **Testing** - Runs tests on Go 1.21, 1.22, and 1.23
+- **Linting** - Code quality checks with golangci-lint
+- **Security** - Security scanning with gosec
+- **Building** - Multi-platform binary builds
+- **Releases** - Automatic release creation with binaries
 
 ### Binary Releases
 
-Download the latest binary for your platform from the [releases page](https://github.com/kazuto/jiraflow/releases).
+Download pre-built binaries for your platform from the [releases page](https://github.com/kazuto/jiraflow/releases).
+
+Available platforms:
+- **Linux** (amd64, arm64)
+- **macOS** (amd64, arm64/Apple Silicon)
+- **Windows** (amd64)
+
+#### Installation from Binary
+```bash
+# Download and install (example for Linux amd64)
+curl -L https://github.com/kazuto/jiraflow/releases/latest/download/jiraflow-linux-amd64 -o jiraflow
+chmod +x jiraflow
+sudo mv jiraflow /usr/local/bin/
+```
+
+### Verify Installation
+
+```bash
+# Check version
+jiraflow --version
+
+# Run help
+jiraflow --help
+
+# Test in a Git repository
+cd /path/to/your/git/repo
+jiraflow --dry-run --type feature --ticket TEST-123 --title "Test installation"
+```
 
 ## Configuration
 
-JiraFlow uses a configuration file located at `~/.config/jiraflow/jiraflow.yaml`.
+JiraFlow automatically creates a configuration file at `~/.config/jiraflow/jiraflow.yaml` on first run with sensible defaults. No manual setup required!
 
-Create the configuration directory and file:
+### Automatic Configuration
+
+When you run JiraFlow for the first time, it will:
+1. Create the `~/.config/jiraflow/` directory
+2. Generate a default configuration file
+3. Use the configuration immediately
+
+### Manual Configuration (Optional)
+
+You can customize the configuration by editing the file:
 
 ```bash
-mkdir -p ~/.config/jiraflow
-touch ~/.config/jiraflow/jiraflow.yaml
+# Edit configuration
+nano ~/.config/jiraflow/jiraflow.yaml
+
+# Or use your preferred editor
+code ~/.config/jiraflow/jiraflow.yaml
 ```
 
 ### Configuration Options
 
+See [`jiraflow.example.yaml`](jiraflow.example.yaml) for a complete configuration example with all available options and documentation.
+
+#### Key Settings
+
 ```yaml
-# Maximum branch name length (default: 60)
+# Maximum branch name length (10-200, default: 60)
 max_branch_length: 60
 
-# Default branch type if not specified (default: feature)
+# Default branch type for non-interactive mode (default: feature)
 default_branch_type: feature
 
-# Branch type prefixes
+# Branch type prefixes - customize to match your team's conventions
 branch_types:
-  feature: "feature/"
-  hotfix: "hotfix/"
-  refactor: "refactor/"
-  support: "support/"
+  feature: "feature/"     # New features and enhancements
+  hotfix: "hotfix/"       # Critical bug fixes for production
+  refactor: "refactor/"   # Code improvements without changing functionality
+  support: "support/"     # Maintenance and support tasks
 
-# Character replacements for branch name sanitization
+# Branch name sanitization
 sanitization:
-  # Replace spaces and special characters with this (default: -)
-  separator: "-"
-  # Convert to lowercase (default: true)
-  lowercase: false
-  # Remove German umlauts (äöüÄÖÜß) (default: false)
-  remove_umlauts: false
+  separator: "-"          # Replace spaces/special chars (default: -)
+  lowercase: true         # Convert to lowercase (default: true)
+  remove_umlauts: false   # Remove German umlauts äöüÄÖÜß (default: false)
+```
+
+#### Custom Configuration Examples
+
+```bash
+# Copy example configuration
+cp jiraflow.example.yaml ~/.config/jiraflow/jiraflow.yaml
+
+# Edit with your preferences
+nano ~/.config/jiraflow/jiraflow.yaml
 ```
 
 ## Usage
@@ -97,7 +275,7 @@ sanitization:
 jiraflow [branch-type] [ticket-number] [ticket-title (optional)]
 ```
 
-If no ticket title is provided, JiraFlow will automatically fetch the title from Jira using the Jira CLI (`jira view` command).
+If no ticket title is provided, JiraFlow will automatically fetch the title from Jira using the Jira CLI (`jira issue view --raw` command).
 
 ### Examples
 
@@ -112,7 +290,7 @@ Output: `feature/PROJ-123-Add-user-profile-dashboard`
 jiraflow feature PROJ-123
 ```
 Output: `feature/PROJ-123-Add-user-profile-dashboard`
-(Title fetched automatically via `jira view PROJ-123`)
+(Title fetched automatically via `jira issue view PROJ-123 --raw`)
 
 **Create a hotfix branch:**
 ```bash
@@ -138,26 +316,46 @@ jiraflow PROJ-555
 ```
 Output: `feature/PROJ-555-Implement-new-authentication-flow`
 
-### Interactive Mode
+### Interactive Mode (Recommended)
 
-Run jiraflow without arguments for beautiful interactive prompts:
+Run jiraflow without arguments to launch the beautiful interactive TUI:
 
 ```bash
 jiraflow
 ```
 
-The interactive TUI will guide you through:
-1. **Branch type selection** - Choose from feature, hotfix, refactor, or support
-2. **Base branch selection** - Pick any local branch with search functionality
-3. **Ticket number input** - Enter your Jira ticket number
-4. **Title input** - Optionally provide a title or let it fetch from Jira CLI
-5. **Confirmation** - Review and confirm before creating the branch
+#### Interactive Workflow
 
-The TUI features:
-- 🎨 Beautiful, colorful interface
-- 🔍 Searchable branch list with fuzzy matching
-- ⌨️ Intuitive keyboard navigation
-- 🔙 Step-by-step navigation with back/forward support
+The TUI guides you through a 4-step process:
+
+1. **🎯 Branch Type Selection**
+   - Choose from: feature, hotfix, refactor, support
+   - Navigate with arrow keys, select with Enter
+
+2. **🌿 Base Branch Selection**
+   - See all your local Git branches
+   - Real-time search with `/` key
+   - Fuzzy matching to find branches quickly
+
+3. **🎫 Ticket Information**
+   - Enter Jira ticket number (e.g., PROJ-123)
+   - Optionally enter title or auto-fetch from Jira
+   - Tab between fields, Enter to continue
+
+4. **✅ Confirmation & Creation**
+   - Preview the final branch name
+   - Confirm to create and checkout the branch
+   - See success confirmation
+
+#### TUI Features
+
+- 🎨 **Beautiful Interface** - Built with Charm Bracelet libraries
+- 🔍 **Smart Search** - Fuzzy matching for branch names
+- ⌨️ **Keyboard Navigation** - Intuitive shortcuts (↑/↓, Enter, Esc, /)
+- 🔙 **Step Navigation** - Go back/forward through steps
+- 🎯 **Real-time Preview** - See branch name as you type
+- 🚨 **Error Handling** - Clear error messages and recovery options
+- 🎭 **Graceful Degradation** - Works even if Jira CLI is unavailable
 
 ### TUI Controls
 
@@ -189,6 +387,70 @@ jiraflow --dry-run feature PROJ-123 "Add user profile dashboard"
 - **hotfix/** - Critical bug fixes for production
 - **refactor/** - Code improvements without changing functionality
 - **support/** - Maintenance and support tasks
+
+## Troubleshooting
+
+### Common Issues
+
+#### "Not a Git repository"
+```bash
+# Ensure you're in a Git repository
+git status
+
+# Initialize if needed
+git init
+```
+
+#### "Jira CLI not found" or "Failed to fetch title"
+This is normal if Jira CLI isn't installed or configured. JiraFlow will:
+- Allow manual title entry
+- Continue working without Jira integration
+- Show helpful error messages
+
+#### "Branch already exists"
+```bash
+# List existing branches
+git branch
+
+# Delete existing branch if needed
+git branch -D feature/PROJ-123-existing-branch
+
+# Or use a different ticket number/title
+```
+
+#### Configuration Issues
+```bash
+# Reset to defaults
+rm ~/.config/jiraflow/jiraflow.yaml
+jiraflow  # Will recreate with defaults
+
+# Check configuration
+cat ~/.config/jiraflow/jiraflow.yaml
+```
+
+#### Permission Issues
+```bash
+# Ensure proper permissions for config directory
+chmod 755 ~/.config/jiraflow/
+chmod 644 ~/.config/jiraflow/jiraflow.yaml
+```
+
+### Getting Help
+
+- **In-app help**: Press `?` in interactive mode
+- **Command help**: `jiraflow --help`
+- **Version info**: `jiraflow --version`
+- **Issues**: [GitHub Issues](https://github.com/kazuto/jiraflow/issues)
+
+### Debug Mode
+
+```bash
+# Run with verbose output
+JIRAFLOW_DEBUG=1 jiraflow
+
+# Test configuration loading
+jiraflow --dry-run --type feature --ticket TEST-123
+```
 
 ## Contributing
 
