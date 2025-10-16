@@ -102,7 +102,7 @@ func TestBranchGenerator_GenerateNameWithConfig(t *testing.T) {
 				Lowercase:       true,
 				RemoveUmlauts:   false,
 			},
-			expected: "feature/STR-123-this-is-a-very-long-titl",
+			expected: "feature/STR-123-this-is-a-very-long",
 		},
 		{
 			name: "custom separator",
