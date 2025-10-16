@@ -22,3 +22,8 @@ type ConfigManager interface {
 	Validate(*Config) error
 	GetConfigPath() string
 }
+
+// NewConfigManager creates a new ConfigManager instance
+func NewConfigManager() ConfigManager {
+	return NewFileConfigManager()
+}
