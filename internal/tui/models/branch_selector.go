@@ -337,25 +337,52 @@ func (m BranchSelectorModel) renderSearchSummary() string {
 
 // renderHelp renders the help text
 func (m BranchSelectorModel) renderHelp() string {
-	var helpItems []string
-
+	var sections []string
+	
+	// Main help based on current mode
+	var mainHelp []string
 	if m.searching {
-		helpItems = []string{
-			"type to search",
-			"enter/esc to finish search",
-			"ctrl+u to clear",
+		mainHelp = []string{
+			"type to search branches",
+			"enter/esc finish search",
+			"ctrl+u clear search",
 		}
 	} else {
-		helpItems = []string{
-			"↑/↓ navigate",
-			"/ to search",
-			"enter to select",
-			"esc to go back",
+		mainHelp = []string{
+			"↑/↓ or j/k navigate",
+			"/ start search",
+			"enter select branch",
 		}
 	}
-
-	help := strings.Join(helpItems, " • ")
-	return components.HelpStyle.Render(help)
+	
+	mainHelpText := strings.Join(mainHelp, " • ")
+	sections = append(sections, components.HelpStyle.Render(mainHelpText))
+	
+	// Additional context help
+	var contextHelp []string
+	if !m.searching {
+		if len(m.filteredItems) == 0 {
+			contextHelp = append(contextHelp, "No branches available")
+		} else {
+			contextHelp = append(contextHelp, fmt.Sprintf("%d branches available", len(m.filteredItems)))
+		}
+	} else {
+		searchTerm := m.searchInput.Value()
+		if searchTerm != "" {
+			contextHelp = append(contextHelp, fmt.Sprintf("Searching for: %s", searchTerm))
+		} else {
+			contextHelp = append(contextHelp, "Type to filter branches")
+		}
+	}
+	
+	if len(contextHelp) > 0 {
+		contextStyle := components.HelpStyle.Copy().
+			Foreground(components.ColorMuted).
+			Faint(true)
+		sections = append(sections, contextStyle.Render(strings.Join(contextHelp, " • ")))
+	}
+	
+	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }
 
 // GetSelected returns the currently selected branch name
@@ -398,4 +425,19 @@ func (m *BranchSelectorModel) Reset() {
 	m.searchInput.SetValue("")
 	m.searchInput.Blur()
 	m.updateFilter("")
+}
+
+// IsSearching returns true if the component is in search mode
+func (m BranchSelectorModel) IsSearching() bool {
+	return m.searching
+}
+
+// GetSearchTerm returns the current search term
+func (m BranchSelectorModel) GetSearchTerm() string {
+	return m.searchInput.Value()
+}
+
+// GetBranchCount returns the number of available branches
+func (m BranchSelectorModel) GetBranchCount() int {
+	return len(m.filteredItems)
 }

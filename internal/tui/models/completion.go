@@ -146,12 +146,9 @@ func (m CompletionModel) renderSuccess() []string {
 	
 	sections = append(sections, "")
 	
-	// Exit instructions
-	exitText := lipgloss.NewStyle().
-		Foreground(components.ColorMuted).
-		Italic(true).
-		Render("Press Enter or 'q' to exit")
-	sections = append(sections, exitText)
+	// Exit instructions with enhanced help
+	help := m.renderSuccessHelp()
+	sections = append(sections, help)
 	
 	return sections
 }
@@ -208,12 +205,9 @@ func (m CompletionModel) renderError() []string {
 	
 	sections = append(sections, "")
 	
-	// Exit instructions
-	exitText := lipgloss.NewStyle().
-		Foreground(components.ColorMuted).
-		Italic(true).
-		Render("Press Enter or 'q' to exit")
-	sections = append(sections, exitText)
+	// Exit instructions with enhanced help
+	help := m.renderErrorHelp()
+	sections = append(sections, help)
 	
 	return sections
 }
@@ -288,4 +282,63 @@ func (m *CompletionModel) Reset() {
 	m.branchName = ""
 	m.baseBranch = ""
 	m.errorMessage = ""
+}
+
+// renderSuccessHelp renders help text for the success screen
+func (m CompletionModel) renderSuccessHelp() string {
+	var sections []string
+	
+	// Main help
+	mainHelp := []string{
+		"enter exit application",
+		"q quit",
+	}
+	
+	mainHelpText := strings.Join(mainHelp, " • ")
+	sections = append(sections, components.HelpStyle.Render(mainHelpText))
+	
+	// Context help
+	contextHelp := []string{
+		"Branch created and checked out successfully",
+		"Ready to start development",
+	}
+	
+	contextStyle := components.HelpStyle.Copy().
+		Foreground(components.ColorMuted).
+		Faint(true)
+	sections = append(sections, contextStyle.Render(strings.Join(contextHelp, " • ")))
+	
+	return lipgloss.JoinVertical(lipgloss.Left, sections...)
+}
+
+// renderErrorHelp renders help text for the error screen
+func (m CompletionModel) renderErrorHelp() string {
+	var sections []string
+	
+	// Main help
+	mainHelp := []string{
+		"enter exit application",
+		"q quit",
+	}
+	
+	mainHelpText := strings.Join(mainHelp, " • ")
+	sections = append(sections, components.HelpStyle.Render(mainHelpText))
+	
+	// Context help
+	contextHelp := []string{
+		"Branch creation failed",
+		"Check troubleshooting tips above",
+	}
+	
+	contextStyle := components.HelpStyle.Copy().
+		Foreground(components.ColorMuted).
+		Faint(true)
+	sections = append(sections, contextStyle.Render(strings.Join(contextHelp, " • ")))
+	
+	return lipgloss.JoinVertical(lipgloss.Left, sections...)
+}
+
+// GetState returns the current completion state
+func (m CompletionModel) GetState() CompletionState {
+	return m.state
 }

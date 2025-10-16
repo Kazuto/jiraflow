@@ -106,11 +106,8 @@ func (m ConfirmationModel) View() string {
 	sections = append(sections, branchName)
 	sections = append(sections, "")
 	
-	// Instructions
-	instructions := lipgloss.NewStyle().
-		Foreground(components.ColorMuted).
-		Italic(true).
-		Render("Press Enter to create this branch, or Esc to go back")
+	// Instructions with enhanced help
+	instructions := m.renderHelp()
 	sections = append(sections, instructions)
 	
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
@@ -170,4 +167,31 @@ func (m *ConfirmationModel) Reset() {
 // GetFinalBranch returns the final branch name
 func (m ConfirmationModel) GetFinalBranch() string {
 	return m.finalBranch
+}
+
+// renderHelp renders the help text for the confirmation screen
+func (m ConfirmationModel) renderHelp() string {
+	var sections []string
+	
+	// Main help
+	mainHelp := []string{
+		"enter create branch",
+		"esc go back to edit",
+	}
+	
+	mainHelpText := strings.Join(mainHelp, " • ")
+	sections = append(sections, components.HelpStyle.Render(mainHelpText))
+	
+	// Context help
+	contextHelp := []string{
+		"Review details above before creating",
+		"Branch will be created and checked out",
+	}
+	
+	contextStyle := components.HelpStyle.Copy().
+		Foreground(components.ColorMuted).
+		Faint(true)
+	sections = append(sections, contextStyle.Render(strings.Join(contextHelp, " • ")))
+	
+	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }

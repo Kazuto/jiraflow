@@ -433,16 +433,51 @@ func (m InputFormModel) renderValidationSummary() string {
 
 // renderHelp renders the help text
 func (m InputFormModel) renderHelp() string {
-	var helpItems []string
-
-	helpItems = []string{
-		"tab/↑↓ navigate fields",
-		"enter submit form",
-		"esc back",
+	var sections []string
+	
+	// Main help based on current field
+	var mainHelp []string
+	switch m.currentField {
+	case FieldTicketNumber:
+		mainHelp = []string{
+			"type ticket number (PROJ-123 format)",
+			"tab/↓ next field",
+			"enter submit form",
+		}
+	case FieldTitle:
+		mainHelp = []string{
+			"type title or leave empty",
+			"tab/↑ previous field", 
+			"enter submit form",
+		}
 	}
-
-	help := strings.Join(helpItems, " • ")
-	return components.HelpStyle.Render(help)
+	
+	mainHelpText := strings.Join(mainHelp, " • ")
+	sections = append(sections, components.HelpStyle.Render(mainHelpText))
+	
+	// Context help - show form status and Jira availability
+	var contextHelp []string
+	
+	// Form validation status
+	if m.isFormValid() {
+		contextHelp = append(contextHelp, "✓ Form ready")
+	} else {
+		contextHelp = append(contextHelp, "Form incomplete")
+	}
+	
+	// Jira status
+	if m.jiraClient != nil && m.jiraClient.IsAvailable() {
+		contextHelp = append(contextHelp, "Jira available")
+	} else {
+		contextHelp = append(contextHelp, "Jira unavailable")
+	}
+	
+	contextStyle := components.HelpStyle.Copy().
+		Foreground(components.ColorMuted).
+		Faint(true)
+	sections = append(sections, contextStyle.Render(strings.Join(contextHelp, " • ")))
+	
+	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }
 
 // GetTicketNumber returns the entered ticket number
@@ -519,6 +554,11 @@ func (m *InputFormModel) FocusTitleField() {
 	m.currentField = FieldTitle
 	m.titleInput.Focus()
 	m.ticketInput.Blur()
+}
+
+// IsJiraAvailable returns true if Jira client is available
+func (m InputFormModel) IsJiraAvailable() bool {
+	return m.jiraClient != nil && m.jiraClient.IsAvailable()
 }
 
 // Helper function for min

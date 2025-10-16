@@ -237,14 +237,30 @@ func (m TypeSelectorModel) View() string {
 
 // renderHelp renders the help text
 func (m TypeSelectorModel) renderHelp() string {
-	helpItems := []string{
-		"↑/↓ navigate",
-		"enter to select",
-		"esc to go back",
+	var sections []string
+	
+	// Main help
+	mainHelp := []string{
+		"↑/↓ or j/k navigate",
+		"enter select type",
 	}
-
-	help := strings.Join(helpItems, " • ")
-	return components.HelpStyle.Render(help)
+	
+	mainHelpText := strings.Join(mainHelp, " • ")
+	sections = append(sections, components.HelpStyle.Render(mainHelpText))
+	
+	// Context help - show current selection and available types
+	var contextHelp []string
+	if currentItem, ok := m.GetCurrentItem(); ok {
+		contextHelp = append(contextHelp, fmt.Sprintf("Current: %s", currentItem.displayName))
+	}
+	contextHelp = append(contextHelp, fmt.Sprintf("%d types available", len(m.types)))
+	
+	contextStyle := components.HelpStyle.Copy().
+		Foreground(components.ColorMuted).
+		Faint(true)
+	sections = append(sections, contextStyle.Render(strings.Join(contextHelp, " • ")))
+	
+	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }
 
 // GetSelected returns the currently selected branch type key

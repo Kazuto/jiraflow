@@ -416,22 +416,7 @@ func (m AppModel) renderHeader() string {
 
 // renderFooter renders the application footer with help text
 func (m AppModel) renderFooter() string {
-	var helpKeys []string
-	
-	switch m.state {
-	case StateTypeSelection:
-		helpKeys = []string{"↑/↓ or j/k navigate", "enter select", "q quit"}
-	case StateBranchSelection:
-		helpKeys = []string{"↑/↓ or j/k navigate", "/ search", "enter select", "esc back", "q quit"}
-	case StateTicketInput, StateTitleInput:
-		helpKeys = []string{"tab next field", "enter continue", "esc back", "q quit"}
-	case StateConfirmation:
-		helpKeys = []string{"y/enter create branch", "n/esc back", "q quit"}
-	case StateComplete:
-		helpKeys = []string{"enter exit", "q quit"}
-	}
-	
-	help := strings.Join(helpKeys, " • ")
+	help := m.renderContextualHelp()
 	
 	// Add a separator line above the help
 	separator := strings.Repeat("─", m.width)
@@ -440,8 +425,248 @@ func (m AppModel) renderFooter() string {
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		separatorStyle.Render(separator),
-		components.HelpStyle.Render(help),
+		help,
 	)
+}
+
+// renderContextualHelp renders context-sensitive help based on current screen
+func (m AppModel) renderContextualHelp() string {
+	helpRenderer := components.NewHelpRenderer(m.width)
+	
+	// Get key bindings for current state
+	bindings := m.getKeyBindings()
+	
+	// Get context information
+	contextInfo := m.getContextInfo()
+	
+	// Render using the help renderer
+	if len(bindings) > 0 {
+		return helpRenderer.RenderKeyBindings(bindings)
+	}
+	
+	// Fallback to simple context help
+	mainHelp := m.getMainHelpText()
+	return helpRenderer.RenderContextualHelp(mainHelp, contextInfo)
+}
+
+// getMainHelpText returns the main help text for the current state
+func (m AppModel) getMainHelpText() string {
+	var helpKeys []string
+	
+	switch m.state {
+	case StateTypeSelection:
+		helpKeys = []string{
+			"↑/↓ or j/k navigate",
+			"enter select type",
+		}
+		
+	case StateBranchSelection:
+		// Check if branch selector is in search mode
+		isSearching := m.branchModel.IsSearching()
+		if isSearching {
+			helpKeys = []string{
+				"type to search branches",
+				"enter finish search",
+				"ctrl+u clear search",
+				"esc cancel search",
+			}
+		} else {
+			helpKeys = []string{
+				"↑/↓ or j/k navigate",
+				"/ start search",
+				"enter select branch",
+				"esc back to type selection",
+			}
+		}
+		
+	case StateTicketInput, StateTitleInput:
+		currentField := m.inputModel.GetCurrentField()
+		if currentField == models.FieldTicketNumber {
+			helpKeys = []string{
+				"type ticket number (e.g., PROJ-123)",
+				"tab/↓ next field",
+				"enter submit form",
+				"esc back to branch selection",
+			}
+		} else {
+			helpKeys = []string{
+				"type title or leave empty for auto-fetch",
+				"tab/↑ previous field",
+				"enter submit form",
+				"esc back to branch selection",
+			}
+		}
+		
+	case StateConfirmation:
+		helpKeys = []string{
+			"enter create branch",
+			"esc back to ticket input",
+		}
+		
+	case StateComplete:
+		helpKeys = []string{
+			"enter exit application",
+		}
+	}
+	
+	if len(helpKeys) > 0 {
+		return strings.Join(helpKeys, " • ")
+	}
+	return ""
+}
+
+// getKeyBindings returns key bindings for the current state
+func (m AppModel) getKeyBindings() []components.KeyBinding {
+	var bindings []components.KeyBinding
+	
+	switch m.state {
+	case StateTypeSelection:
+		bindings = []components.KeyBinding{
+			{Keys: []string{"↑/↓", "j/k"}, Description: "navigate"},
+			{Keys: []string{"enter"}, Description: "select type"},
+			{Keys: []string{"q"}, Description: "quit", Global: true},
+			{Keys: []string{"ctrl+c"}, Description: "force quit", Global: true},
+		}
+		
+	case StateBranchSelection:
+		isSearching := m.branchModel.IsSearching()
+		if isSearching {
+			bindings = []components.KeyBinding{
+				{Keys: []string{"type"}, Description: "search branches"},
+				{Keys: []string{"enter"}, Description: "finish search"},
+				{Keys: []string{"ctrl+u"}, Description: "clear search"},
+				{Keys: []string{"esc"}, Description: "cancel search"},
+				{Keys: []string{"q"}, Description: "quit", Global: true},
+				{Keys: []string{"ctrl+c"}, Description: "force quit", Global: true},
+			}
+		} else {
+			bindings = []components.KeyBinding{
+				{Keys: []string{"↑/↓", "j/k"}, Description: "navigate"},
+				{Keys: []string{"/"}, Description: "start search"},
+				{Keys: []string{"enter"}, Description: "select branch"},
+				{Keys: []string{"esc"}, Description: "back to type selection"},
+				{Keys: []string{"q"}, Description: "quit", Global: true},
+				{Keys: []string{"ctrl+c"}, Description: "force quit", Global: true},
+			}
+		}
+		
+	case StateTicketInput, StateTitleInput:
+		currentField := m.inputModel.GetCurrentField()
+		if currentField == models.FieldTicketNumber {
+			bindings = []components.KeyBinding{
+				{Keys: []string{"type"}, Description: "enter ticket number (PROJ-123)"},
+				{Keys: []string{"tab", "↓"}, Description: "next field"},
+				{Keys: []string{"enter"}, Description: "submit form"},
+				{Keys: []string{"esc"}, Description: "back to branch selection"},
+				{Keys: []string{"q"}, Description: "quit", Global: true},
+				{Keys: []string{"ctrl+c"}, Description: "force quit", Global: true},
+			}
+		} else {
+			bindings = []components.KeyBinding{
+				{Keys: []string{"type"}, Description: "enter title or leave empty"},
+				{Keys: []string{"tab", "↑"}, Description: "previous field"},
+				{Keys: []string{"enter"}, Description: "submit form"},
+				{Keys: []string{"esc"}, Description: "back to branch selection"},
+				{Keys: []string{"q"}, Description: "quit", Global: true},
+				{Keys: []string{"ctrl+c"}, Description: "force quit", Global: true},
+			}
+		}
+		
+	case StateConfirmation:
+		bindings = []components.KeyBinding{
+			{Keys: []string{"enter"}, Description: "create branch"},
+			{Keys: []string{"esc"}, Description: "back to edit"},
+			{Keys: []string{"q"}, Description: "quit", Global: true},
+			{Keys: []string{"ctrl+c"}, Description: "force quit", Global: true},
+		}
+		
+	case StateComplete:
+		bindings = []components.KeyBinding{
+			{Keys: []string{"enter"}, Description: "exit application"},
+			{Keys: []string{"q"}, Description: "quit", Global: true},
+			{Keys: []string{"ctrl+c"}, Description: "force quit", Global: true},
+		}
+	}
+	
+	return bindings
+}
+
+// getContextInfo returns context information for the current state
+func (m AppModel) getContextInfo() []string {
+	var info []string
+	
+	switch m.state {
+	case StateTypeSelection:
+		if currentItem, ok := m.typeModel.GetCurrentItem(); ok {
+			info = append(info, fmt.Sprintf("Current: %s", currentItem.Title()))
+		}
+		info = append(info, fmt.Sprintf("%d types available", len(m.typeModel.GetAvailableTypes())))
+		
+	case StateBranchSelection:
+		if m.branchModel.IsSearching() {
+			searchTerm := m.branchModel.GetSearchTerm()
+			if searchTerm != "" {
+				info = append(info, fmt.Sprintf("Searching: %s", searchTerm))
+			} else {
+				info = append(info, "Type to filter branches")
+			}
+		} else {
+			info = append(info, fmt.Sprintf("%d branches available", m.branchModel.GetBranchCount()))
+		}
+		
+	case StateTicketInput, StateTitleInput:
+		if m.inputModel.IsValid() {
+			info = append(info, "✓ Form ready")
+		} else {
+			info = append(info, "Form incomplete")
+		}
+		
+		if m.inputModel.IsJiraAvailable() {
+			info = append(info, "Jira available")
+		} else {
+			info = append(info, "Jira unavailable")
+		}
+		
+	case StateConfirmation:
+		info = append(info, "Review details before creating")
+		info = append(info, "Branch will be created and checked out")
+		
+	case StateComplete:
+		if m.completionModel.GetState() == models.CompletionSuccess {
+			info = append(info, "Branch created successfully")
+			info = append(info, "Ready to start development")
+		} else {
+			info = append(info, "Branch creation failed")
+			info = append(info, "Check troubleshooting tips")
+		}
+	}
+	
+	return info
+}
+
+// getGlobalHelpText returns help text for globally available shortcuts (legacy method)
+func (m AppModel) getGlobalHelpText() string {
+	var globalKeys []string
+	
+	// Always available shortcuts
+	globalKeys = append(globalKeys, "q quit")
+	globalKeys = append(globalKeys, "ctrl+c force quit")
+	
+	// Add state-specific global shortcuts
+	switch m.state {
+	case StateTypeSelection:
+		// No additional global shortcuts for first screen
+	default:
+		// All other screens can go back
+		if m.state != StateComplete {
+			// Don't show esc for complete screen as it's handled differently
+			if m.state == StateConfirmation {
+				globalKeys = append(globalKeys, "esc back")
+			}
+		}
+	}
+	
+	return "Global: " + strings.Join(globalKeys, " • ")
 }
 
 // renderError renders error messages using the error handler
