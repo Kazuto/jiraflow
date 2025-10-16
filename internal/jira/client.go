@@ -38,8 +38,8 @@ func (c *CLIClient) GetTicketTitle(ticketID string) (string, error) {
 		return "", errors.NewJiraError(ticketID, "jira CLI not found - please install jira CLI or provide title manually", true)
 	}
 
-	// Execute jira view command with JSON output
-	cmd := exec.Command("jira", "view", ticketID, "--plain")
+	// Execute jira issue view command with raw JSON output
+	cmd := exec.Command("jira", "issue", "view", ticketID, "--raw")
 	output, err := cmd.Output()
 	if err != nil {
 		// Try to get more specific error information
@@ -56,8 +56,8 @@ func (c *CLIClient) GetTicketTitle(ticketID string) (string, error) {
 		return "", errors.NewJiraError(ticketID, fmt.Sprintf("failed to execute jira command: %v", err), true)
 	}
 
-	// Parse the output to extract the title
-	title, err := c.parseTicketTitle(string(output))
+	// Parse the JSON output to extract the title
+	title, err := c.parseJSONTitle(string(output))
 	if err != nil {
 		return "", errors.NewJiraError(ticketID, fmt.Sprintf("failed to parse ticket title: %v", err), true)
 	}
@@ -69,50 +69,23 @@ func (c *CLIClient) GetTicketTitle(ticketID string) (string, error) {
 	return title, nil
 }
 
-// parseTicketTitle extracts the title from jira CLI output
-func (c *CLIClient) parseTicketTitle(output string) (string, error) {
-	lines := strings.Split(output, "\n")
-	
-	// Look for the summary/title line in the plain output
-	// The jira CLI plain output typically has the format:
-	// KEY: TICKET-123
-	// Summary: The ticket title
-	// Status: In Progress
-	// ...
-	for i, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(strings.ToLower(line), "summary:") {
-			// Extract the title after "Summary:"
-			title := strings.TrimSpace(strings.TrimPrefix(line, "Summary:"))
-			title = strings.TrimSpace(strings.TrimPrefix(title, "summary:"))
-			return title, nil
-		}
-		// Sometimes the title might be on the next line
-		if strings.ToLower(line) == "summary:" && i+1 < len(lines) {
-			title := strings.TrimSpace(lines[i+1])
-			return title, nil
-		}
-	}
 
-	// Fallback: try JSON parsing if plain format doesn't work
-	return c.parseJSONTitle(output)
-}
 
-// parseJSONTitle attempts to parse JSON output as fallback
+// parseJSONTitle parses the JSON output from jira CLI --raw command
 func (c *CLIClient) parseJSONTitle(output string) (string, error) {
-	// Try to parse as JSON in case the output format is different
+	// Parse the JSON response from jira issue view --raw
 	var ticket struct {
 		Fields struct {
 			Summary string `json:"summary"`
 		} `json:"fields"`
 	}
 	
-	if err := json.Unmarshal([]byte(output), &ticket); err == nil {
-		return ticket.Fields.Summary, nil
+	if err := json.Unmarshal([]byte(output), &ticket); err != nil {
+		return "", fmt.Errorf("failed to parse JSON response: %v", err)
 	}
 
-	// If JSON parsing fails, return error
-	return "", fmt.Errorf("could not parse ticket title from output")
+	// Return the summary field which contains the ticket title
+	return ticket.Fields.Summary, nil
 }
 
 // MockClient implements JiraClient for testing purposes

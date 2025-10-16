@@ -23,6 +23,10 @@ var (
 	baseBranch   string
 	ticketNumber string
 	ticketTitle  string
+	
+	// Version information
+	appVersion   = "dev"
+	appBuildTime = "unknown"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -60,6 +64,13 @@ Examples:
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() error {
 	return rootCmd.Execute()
+}
+
+// SetVersionInfo sets the version information for the application
+func SetVersionInfo(version, buildTime string) {
+	appVersion = version
+	appBuildTime = buildTime
+	rootCmd.Version = fmt.Sprintf("%s (built %s)", version, buildTime)
 }
 
 func init() {

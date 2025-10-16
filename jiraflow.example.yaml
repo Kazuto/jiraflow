@@ -1,0 +1,62 @@
+# JiraFlow Configuration Example
+# This file shows all available configuration options with their default values.
+# Copy this file to ~/.config/jiraflow/jiraflow.yaml and customize as needed.
+
+# Maximum length for generated branch names (10-200)
+# Longer names will be truncated while preserving readability
+max_branch_length: 60
+
+# Default branch type when not specified in non-interactive mode
+# Must be one of the keys defined in branch_types below
+default_branch_type: feature
+
+# Branch type prefixes - customize these to match your team's conventions
+branch_types:
+  feature: "feature/"     # New features and enhancements
+  hotfix: "hotfix/"       # Critical bug fixes for production
+  refactor: "refactor/"   # Code improvements without changing functionality
+  support: "support/"     # Maintenance and support tasks
+  # Add custom types as needed:
+  # bugfix: "bugfix/"
+  # chore: "chore/"
+  # docs: "docs/"
+
+# Branch name sanitization settings
+sanitization:
+  # Character used to replace spaces and special characters
+  # Common options: "-", "_", "."
+  separator: "-"
+  
+  # Convert branch names to lowercase
+  # Set to false to preserve original casing
+  lowercase: true
+  
+  # Remove German umlauts (äöüÄÖÜß → aouAOUs)
+  # Useful for international teams with German developers
+  remove_umlauts: false
+
+# Advanced Configuration Examples:
+# 
+# For teams using different branch prefixes:
+# branch_types:
+#   feat: "feat/"
+#   fix: "fix/"
+#   docs: "docs/"
+#   style: "style/"
+#   refactor: "refactor/"
+#   test: "test/"
+#   chore: "chore/"
+#
+# For teams preferring underscores:
+# sanitization:
+#   separator: "_"
+#   lowercase: false
+#
+# For shorter branch names:
+# max_branch_length: 40
+#
+# For teams with international characters:
+# sanitization:
+#   separator: "-"
+#   lowercase: true
+#   remove_umlauts: true
