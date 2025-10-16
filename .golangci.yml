@@ -1,32 +1,8 @@
-# GolangCI-Lint configuration for JiraFlow
-# See https://golangci-lint.run/usage/configuration/
-
 version: 2
 
 run:
   timeout: 5m
-  issues-exit-code: 1
   tests: true
-  skip-dirs:
-    - vendor
-    - .git
-    - .github
-
-output:
-  format: colored-line-number
-  print-issued-lines: true
-  print-linter-name: true
-
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
-  
-  govet:
-    check-shadowing: true
-  
-  misspell:
-    locale: US
 
 linters:
   enable:
@@ -37,32 +13,3 @@ linters:
     - unused
     - gosec
     - misspell
-
-issues:
-  exclude-rules:
-    # Exclude all linters from running on test files
-    - path: _test\.go
-      linters:
-        - errcheck
-        - gosec
-        - staticcheck
-        - unused
-    
-    # Exclude known linter issues
-    - text: "Use of weak random number generator"
-      linters:
-        - gosec
-    
-    # Exclude deprecated Copy() method warnings (lipgloss library issue)
-    - text: "Copy is deprecated"
-      linters:
-        - staticcheck
-    
-    # Exclude unused function warnings for now
-    - text: "is unused"
-      linters:
-        - unused
-  
-  exclude-use-default: true
-  max-issues-per-linter: 10
-  max-same-issues: 3
