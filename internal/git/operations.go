@@ -81,7 +81,7 @@ func (g *LocalGitRepository) GetCurrentBranch() (string, error) {
 	return currentBranch, nil
 }
 
-// CreateBranch creates a new Git branch from the specified base branch
+// CreateBranch creates a new Git branch from the specified base branch and checks it out
 func (g *LocalGitRepository) CreateBranch(name, baseBranch string) error {
 	if !g.IsGitRepository() {
 		return errors.NewGitError("branch", "not a git repository", false)
@@ -95,9 +95,10 @@ func (g *LocalGitRepository) CreateBranch(name, baseBranch string) error {
 		return errors.NewGitError("branch", "base branch cannot be empty", false)
 	}
 
-	cmd := exec.Command("git", "branch", name, baseBranch)
+	// Create and checkout the branch in one command
+	cmd := exec.Command("git", "checkout", "-b", name, baseBranch)
 	if err := cmd.Run(); err != nil {
-		return errors.NewGitError("branch", "failed to create branch '"+name+"' from '"+baseBranch+"': "+err.Error(), true)
+		return errors.NewGitError("branch", "failed to create and checkout branch '"+name+"' from '"+baseBranch+"': "+err.Error(), true)
 	}
 
 	return nil

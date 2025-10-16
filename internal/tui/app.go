@@ -8,9 +8,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"jiraflow/internal/branch"
 	"jiraflow/internal/config"
 	"jiraflow/internal/errors"
 	"jiraflow/internal/git"
+	"jiraflow/internal/jira"
 	"jiraflow/internal/tui/components"
 	"jiraflow/internal/tui/models"
 )
@@ -108,8 +110,11 @@ func NewAppModel(cfg *config.Config, gitRepo git.GitRepository) *AppModel {
 		// Note: Error will be handled gracefully during runtime
 	}
 	
-	// Initialize input form model (Jira client will be set later if available)
-	inputModel := models.NewInputFormModel(nil)
+	// Initialize Jira client
+	jiraClient := jira.NewCLIClient()
+	
+	// Initialize input form model with Jira client
+	inputModel := models.NewInputFormModel(jiraClient)
 	
 	// Initialize confirmation and completion models
 	confirmationModel := models.NewConfirmationModel()
@@ -773,75 +778,29 @@ func (m *AppModel) SetSelectedData(branchType, baseBranch, ticket, title string)
 	m.ticketTitle = title
 }
 
-// generateBranchName generates the final branch name based on selected data
+// generateBranchName generates the final branch name using the proper branch generator
 func (m AppModel) generateBranchName() string {
-	// Basic branch name generation logic
-	// Format: type/ticket-sanitized-title
+	// Import the branch package components
+	sanitizer := branch.NewBranchSanitizer()
+	generator := branch.NewBranchGenerator(sanitizer)
 	
-	sanitizedTitle := m.sanitizeTitle(m.ticketTitle)
-	
-	var branchName string
-	if sanitizedTitle != "" {
-		branchName = fmt.Sprintf("%s/%s-%s", m.selectedType, m.ticketNumber, sanitizedTitle)
-	} else {
-		branchName = fmt.Sprintf("%s/%s", m.selectedType, m.ticketNumber)
+	// Create branch info
+	branchInfo := branch.BranchInfo{
+		Type:     m.selectedType,
+		TicketID: m.ticketNumber,
+		Title:    m.ticketTitle,
 	}
 	
-	// Apply length limit from config
-	maxLength := m.config.MaxBranchLength
-	if len(branchName) > maxLength {
-		// Truncate while preserving the type and ticket number
-		prefix := fmt.Sprintf("%s/%s", m.selectedType, m.ticketNumber)
-		if len(prefix) < maxLength {
-			remainingLength := maxLength - len(prefix) - 1 // -1 for the dash
-			if remainingLength > 0 && sanitizedTitle != "" {
-				truncatedTitle := sanitizedTitle
-				if len(truncatedTitle) > remainingLength {
-					truncatedTitle = truncatedTitle[:remainingLength]
-				}
-				branchName = fmt.Sprintf("%s-%s", prefix, truncatedTitle)
-			} else {
-				branchName = prefix
-			}
-		} else {
-			// If even the prefix is too long, just use it as is
-			branchName = prefix
-		}
-	}
+	// Create generator config from app config
+	generatorConfig := branch.GeneratorConfigFromAppConfig(
+		m.config.MaxBranchLength,
+		m.config.Sanitization.Separator,
+		m.config.Sanitization.Lowercase,
+		m.config.Sanitization.RemoveUmlauts,
+	)
 	
-	return branchName
-}
-
-// sanitizeTitle sanitizes the title for use in branch names
-func (m AppModel) sanitizeTitle(title string) string {
-	if title == "" {
-		return ""
-	}
-	
-	// Basic sanitization rules
-	sanitized := strings.ToLower(title)
-	
-	// Replace spaces with hyphens
-	sanitized = strings.ReplaceAll(sanitized, " ", "-")
-	
-	// Remove special characters (keep only alphanumeric and hyphens)
-	var result strings.Builder
-	for _, r := range sanitized {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
-			result.WriteRune(r)
-		}
-	}
-	sanitized = result.String()
-	
-	// Remove multiple consecutive hyphens
-	for strings.Contains(sanitized, "--") {
-		sanitized = strings.ReplaceAll(sanitized, "--", "-")
-	}
-	
-	// Remove leading and trailing hyphens
-	sanitized = strings.Trim(sanitized, "-")
-	
-	return sanitized
+	// Generate the branch name
+	return generator.GenerateNameWithConfig(branchInfo, generatorConfig)
 }
 
 // createBranch creates the new Git branch
