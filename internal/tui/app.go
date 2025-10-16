@@ -90,10 +90,20 @@ var keys = DefaultKeyMap()
 
 // NewAppModel creates a new AppModel instance
 func NewAppModel(cfg *config.Config, gitRepo git.GitRepository) *AppModel {
+	// Initialize branch selector with Git branches
+	var branchModel models.BranchSelectorModel
+	if branches, err := gitRepo.GetBranchesWithInfo(); err == nil {
+		branchModel = models.NewBranchSelectorModel(branches)
+	} else {
+		// Fallback to empty branch selector if Git operations fail
+		branchModel = models.NewBranchSelectorModel([]git.BranchInfo{})
+	}
+	
 	return &AppModel{
-		state:  StateTypeSelection,
-		config: cfg,
-		git:    gitRepo,
+		state:       StateTypeSelection,
+		config:      cfg,
+		git:         gitRepo,
+		branchModel: branchModel,
 	}
 }
 
@@ -122,6 +132,10 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		
+		// Update branch selector size
+		m.branchModel.SetSize(msg.Width, msg.Height-6) // Leave space for header/footer
+		
 		return m, nil
 
 	case tea.KeyMsg:
@@ -182,12 +196,25 @@ func (m AppModel) updateTypeSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m AppModel) updateBranchSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Placeholder - will be implemented in task 4.2
-	if key.Matches(msg, keys.Enter) {
-		m.selectedBranch = "main" // Default for now
+	var cmd tea.Cmd
+	
+	// Update the branch selector model
+	m.branchModel, cmd = m.branchModel.Update(msg)
+	
+	// Check if a branch was selected
+	if m.branchModel.HasSelection() {
+		m.selectedBranch = m.branchModel.GetSelected()
 		m.state = StateTicketInput
+		return m, cmd
 	}
-	return m, nil
+	
+	// Handle back navigation
+	if key.Matches(msg, keys.Back) {
+		m.state = StateTypeSelection
+		return m, cmd
+	}
+	
+	return m, cmd
 }
 
 func (m AppModel) updateTicketInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -327,13 +354,18 @@ func (m AppModel) renderTypeSelection() string {
 }
 
 func (m AppModel) renderBranchSelection() string {
-	content := fmt.Sprintf("Selected type: %s\n\n", components.SelectedStyle.Render(m.selectedType))
-	content += "Select base branch:\n\n"
-	content += "→ main\n"
-	content += "  develop\n"
-	content += "  master\n"
+	var sections []string
 	
-	return content
+	// Show selected type
+	selectedType := fmt.Sprintf("Selected type: %s", components.SelectedStyle.Render(m.selectedType))
+	sections = append(sections, selectedType)
+	sections = append(sections, "")
+	
+	// Render the branch selector
+	branchView := m.branchModel.View()
+	sections = append(sections, branchView)
+	
+	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }
 
 func (m AppModel) renderTicketInput() string {

@@ -8,6 +8,7 @@ import (
 // GitRepository interface defines Git operations
 type GitRepository interface {
 	GetLocalBranches() ([]string, error)
+	GetBranchesWithInfo() ([]BranchInfo, error)
 	GetCurrentBranch() (string, error)
 	CreateBranch(name, baseBranch string) error
 	CheckoutBranch(name string) error
