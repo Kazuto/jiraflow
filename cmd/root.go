@@ -69,7 +69,7 @@ func init() {
 	
 	// Non-interactive mode flags
 	rootCmd.Flags().StringVarP(&branchType, "type", "t", "", "Branch type (feature, hotfix, refactor, support)")
-	rootCmd.Flags().StringVarP(&baseBranch, "base", "b", "", "Base branch to create new branch from")
+	rootCmd.Flags().StringVarP(&baseBranch, "base", "b", "", "Base branch to create new branch from (defaults to current branch)")
 	rootCmd.Flags().StringVar(&ticketNumber, "ticket", "", "Jira ticket number (e.g., PROJ-123)")
 	rootCmd.Flags().StringVar(&ticketTitle, "title", "", "Ticket title (optional, will fetch from Jira if not provided)")
 	
@@ -78,6 +78,39 @@ func init() {
 	rootCmd.MarkFlagsMutuallyExclusive("interactive", "base")
 	rootCmd.MarkFlagsMutuallyExclusive("interactive", "ticket")
 	rootCmd.MarkFlagsMutuallyExclusive("interactive", "title")
+	
+	// Add help command
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "help",
+		Short: "Show detailed help and examples",
+		Long: `Show detailed help information and usage examples for JiraFlow.
+
+JiraFlow supports two modes of operation:
+
+1. Interactive Mode (default):
+   Launch a terminal user interface (TUI) to interactively create branches.
+   This mode provides a guided workflow with real-time branch name preview.
+
+2. Non-Interactive Mode:
+   Create branches directly from command-line arguments, perfect for automation.
+
+Exit Codes:
+  0 - Success or user cancelled
+  1 - General error
+  2 - Configuration error
+  3 - Git repository error
+  4 - Jira integration error
+
+Configuration:
+  JiraFlow automatically creates a configuration file at:
+  ~/.config/jiraflow/jiraflow.yaml
+
+  You can customize branch types, naming conventions, and other settings
+  by editing this file.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			cmd.Help()
+		},
+	})
 }
 
 // runJiraFlow is the main entry point for the CLI command
@@ -120,7 +153,28 @@ func runInteractiveMode(cfg *config.Config, gitRepo git.GitRepository) error {
 		fmt.Println()
 	}
 	
-	return tui.RunTUI(cfg, gitRepo)
+	// Display keyboard shortcuts help before launching TUI
+	fmt.Println("🚀 JiraFlow Interactive Mode")
+	fmt.Println()
+	fmt.Println("Keyboard Shortcuts:")
+	fmt.Println("  ↑/↓ or j/k    Navigate lists")
+	fmt.Println("  /             Search (in branch selection)")
+	fmt.Println("  Enter         Select/Confirm")
+	fmt.Println("  Esc           Go back")
+	fmt.Println("  q or Ctrl+C   Quit")
+	fmt.Println()
+	fmt.Println("Press any key to continue...")
+	
+	// Wait for user input before launching TUI
+	var input string
+	fmt.Scanln(&input)
+	
+	// Launch TUI and handle any errors
+	if err := tui.RunTUI(cfg, gitRepo); err != nil {
+		return fmt.Errorf("TUI application failed: %w", err)
+	}
+	
+	return nil
 }
 
 // runNonInteractiveMode handles non-interactive branch creation
@@ -134,10 +188,29 @@ func runNonInteractiveMode(cfg *config.Config, gitRepo git.GitRepository) error 
 	if baseBranch == "" {
 		currentBranch, err := gitRepo.GetCurrentBranch()
 		if err != nil {
-			return fmt.Errorf("failed to get current branch: %w", err)
+			return fmt.Errorf("failed to get current branch (ensure you're in a Git repository): %w", err)
 		}
 		baseBranch = currentBranch
 		fmt.Printf("Using current branch '%s' as base branch\n", baseBranch)
+	} else {
+		// Validate that the specified base branch exists
+		branches, err := gitRepo.GetLocalBranches()
+		if err != nil {
+			return fmt.Errorf("failed to list local branches: %w", err)
+		}
+		
+		branchExists := false
+		for _, branch := range branches {
+			if branch == baseBranch {
+				branchExists = true
+				break
+			}
+		}
+		
+		if !branchExists {
+			return fmt.Errorf("base branch '%s' does not exist locally\nAvailable branches: %s", 
+				baseBranch, strings.Join(branches, ", "))
+		}
 	}
 
 	// Fetch ticket title from Jira if not provided and ticket number is given
@@ -182,10 +255,23 @@ func runNonInteractiveMode(cfg *config.Config, gitRepo git.GitRepository) error 
 		return nil
 	}
 
+	// Check if branch already exists
+	branches, err := gitRepo.GetLocalBranches()
+	if err != nil {
+		return fmt.Errorf("failed to check existing branches: %w", err)
+	}
+	
+	for _, branch := range branches {
+		if branch == branchName {
+			return fmt.Errorf("branch '%s' already exists\nUse a different ticket number or title", branchName)
+		}
+	}
+
 	// Create the branch
 	fmt.Printf("\nCreating branch '%s' from '%s'...\n", branchName, baseBranch)
 	if err := gitRepo.CreateBranch(branchName, baseBranch); err != nil {
-		return fmt.Errorf("failed to create branch: %w", err)
+		return fmt.Errorf("failed to create branch '%s': %w\nEnsure the base branch '%s' exists and you have proper Git permissions", 
+			branchName, err, baseBranch)
 	}
 
 	fmt.Printf("✓ Successfully created and checked out branch '%s'\n", branchName)
@@ -199,6 +285,15 @@ func validateNonInteractiveFlags(cfg *config.Config) error {
 	// Validate branch type
 	if branchType == "" {
 		errors = append(errors, "branch type is required (use --type flag)")
+		
+		// Provide helpful suggestion
+		validTypes := make([]string, 0, len(cfg.BranchTypes))
+		for t := range cfg.BranchTypes {
+			validTypes = append(validTypes, t)
+		}
+		if len(validTypes) > 0 {
+			errors = append(errors, fmt.Sprintf("  Available types: %s", strings.Join(validTypes, ", ")))
+		}
 	} else {
 		// Check if branch type is valid
 		validTypes := make([]string, 0, len(cfg.BranchTypes))
@@ -215,18 +310,25 @@ func validateNonInteractiveFlags(cfg *config.Config) error {
 		}
 		
 		if !isValid {
-			errors = append(errors, fmt.Sprintf("invalid branch type '%s', valid types: %s", 
-				branchType, strings.Join(validTypes, ", ")))
+			errors = append(errors, fmt.Sprintf("invalid branch type '%s'", branchType))
+			errors = append(errors, fmt.Sprintf("  Valid types: %s", strings.Join(validTypes, ", ")))
 		}
 	}
 
 	// Validate ticket number
 	if ticketNumber == "" {
 		errors = append(errors, "ticket number is required (use --ticket flag)")
+		errors = append(errors, "  Example: --ticket PROJ-123")
+	} else {
+		// Basic ticket number format validation
+		if len(ticketNumber) < 3 || !strings.Contains(ticketNumber, "-") {
+			errors = append(errors, fmt.Sprintf("invalid ticket format '%s'", ticketNumber))
+			errors = append(errors, "  Expected format: PROJECT-NUMBER (e.g., PROJ-123)")
+		}
 	}
 
 	if len(errors) > 0 {
-		return fmt.Errorf("validation failed:\n  - %s", strings.Join(errors, "\n  - "))
+		return fmt.Errorf("validation failed:\n  %s", strings.Join(errors, "\n  "))
 	}
 
 	return nil

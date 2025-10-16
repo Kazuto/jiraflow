@@ -92,6 +92,9 @@ var keys = DefaultKeyMap()
 
 // NewAppModel creates a new AppModel instance
 func NewAppModel(cfg *config.Config, gitRepo git.GitRepository) *AppModel {
+	// Initialize type selector model
+	typeModel := models.NewTypeSelectorModel(cfg)
+	
 	// Initialize branch selector with Git branches
 	var branchModel models.BranchSelectorModel
 	if branches, err := gitRepo.GetBranchesWithInfo(); err == nil {
@@ -112,6 +115,7 @@ func NewAppModel(cfg *config.Config, gitRepo git.GitRepository) *AppModel {
 		state:             StateTypeSelection,
 		config:            cfg,
 		git:               gitRepo,
+		typeModel:         typeModel,
 		branchModel:       branchModel,
 		inputModel:        inputModel,
 		confirmationModel: confirmationModel,
@@ -129,8 +133,24 @@ func RunTUI(cfg *config.Config, gitRepo git.GitRepository) error {
 		tea.WithMouseCellMotion(),
 	)
 	
-	_, err := p.Run()
-	return err
+	finalModel, err := p.Run()
+	if err != nil {
+		return fmt.Errorf("TUI application error: %w", err)
+	}
+	
+	// Check if the final model has an error state
+	if appModel, ok := finalModel.(AppModel); ok {
+		if appModel.err != nil {
+			return appModel.err
+		}
+		
+		// Check if user quit without completing the workflow
+		if appModel.state != StateComplete {
+			return fmt.Errorf("user cancelled operation")
+		}
+	}
+	
+	return nil
 }
 
 // Init initializes the TUI application
@@ -146,7 +166,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		
 		// Update component sizes
-		m.branchModel.SetSize(msg.Width, msg.Height-6) // Leave space for header/footer
+		m.typeModel.SetSize(msg.Width, msg.Height-6) // Leave space for header/footer
+		m.branchModel.SetSize(msg.Width, msg.Height-6)
 		m.inputModel.SetSize(msg.Width, msg.Height-6)
 		m.confirmationModel.SetSize(msg.Width, msg.Height-6)
 		m.completionModel.SetSize(msg.Width, msg.Height-6)
@@ -200,14 +221,21 @@ func (m AppModel) handleBack() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// State-specific update methods (placeholder implementations)
+// State-specific update methods
 func (m AppModel) updateTypeSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Placeholder - will be implemented in task 4.3
-	if key.Matches(msg, keys.Enter) {
-		m.selectedType = "feature" // Default for now
+	var cmd tea.Cmd
+	
+	// Update the type selector model
+	m.typeModel, cmd = m.typeModel.Update(msg)
+	
+	// Check if a type was selected
+	if m.typeModel.HasSelection() {
+		m.selectedType = m.typeModel.GetSelected()
 		m.state = StateBranchSelection
+		return m, cmd
 	}
-	return m, nil
+	
+	return m, cmd
 }
 
 func (m AppModel) updateBranchSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -386,19 +414,28 @@ func (m AppModel) renderFooter() string {
 	
 	switch m.state {
 	case StateTypeSelection:
-		helpKeys = []string{"↑/↓ navigate", "enter select", "q quit"}
+		helpKeys = []string{"↑/↓ or j/k navigate", "enter select", "q quit"}
 	case StateBranchSelection:
-		helpKeys = []string{"↑/↓ navigate", "/ search", "enter select", "esc back", "q quit"}
+		helpKeys = []string{"↑/↓ or j/k navigate", "/ search", "enter select", "esc back", "q quit"}
 	case StateTicketInput, StateTitleInput:
-		helpKeys = []string{"type to input", "enter continue", "esc back", "q quit"}
+		helpKeys = []string{"tab next field", "enter continue", "esc back", "q quit"}
 	case StateConfirmation:
-		helpKeys = []string{"enter create branch", "esc back", "q quit"}
+		helpKeys = []string{"y/enter create branch", "n/esc back", "q quit"}
 	case StateComplete:
 		helpKeys = []string{"enter exit", "q quit"}
 	}
 	
 	help := strings.Join(helpKeys, " • ")
-	return components.HelpStyle.Render(help)
+	
+	// Add a separator line above the help
+	separator := strings.Repeat("─", m.width)
+	separatorStyle := lipgloss.NewStyle().Foreground(components.ColorMuted)
+	
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		separatorStyle.Render(separator),
+		components.HelpStyle.Render(help),
+	)
 }
 
 // renderError renders error messages
@@ -408,13 +445,7 @@ func (m AppModel) renderError() string {
 
 // State-specific render methods (placeholder implementations)
 func (m AppModel) renderTypeSelection() string {
-	content := "Select branch type:\n\n"
-	content += "→ feature (default)\n"
-	content += "  hotfix\n"
-	content += "  refactor\n"
-	content += "  support\n"
-	
-	return content
+	return m.typeModel.View()
 }
 
 func (m AppModel) renderBranchSelection() string {
