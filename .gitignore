@@ -1,1 +1,134 @@
 jiraflow
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+coverage.html
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Dependency directories
+vendor/
+
+# Build cache
+.cache/
+
+# Delve debugger
+__debug_bin*
+
+# Air live reload
+tmp/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# AI Coding Tools
+# Claude Code
+.claude/
+
+# Cursor
+.cursor/
+.cursorignore
+
+# GitHub Copilot
+.copilot/
+
+# Cody
+.cody/
+
+# Continue.dev
+.continue/
+
+# Aider
+.aider*
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v3/
+
+# Windsurf
+.windsurf/
+
+# Tabnine
+.tabnine/
+
+# Codium
+.codium/
+
+# Kiro
+.kiro/
+
+# Sourcegraph
+.sourcegraph/
+
+# IDEs and Editors
+# VSCode
+.vscode/
+*.code-workspace
+
+# GoLand / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# OS specific
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+.directory
+.Trash-*
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Debug and profiling
+*.pprof
+*.trace
+cpu.prof
+mem.prof
+block.prof
+mutex.prof
