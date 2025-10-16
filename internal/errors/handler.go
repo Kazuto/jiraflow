@@ -95,11 +95,13 @@ func (h *ErrorHandler) FormatErrorForTUI(err error) string {
 	if jfErr, ok := err.(JiraFlowError); ok {
 		// Error title with icon
 		title := fmt.Sprintf("❌ %s Error", jfErr.Type().String())
-		content.WriteString(h.tuiErrorStyle.Copy().Bold(true).Render(title))
+		titleStyle := h.tuiErrorStyle
+		content.WriteString(titleStyle.Bold(true).Render(title))
 		content.WriteString("\n\n")
 		
 		// User-friendly message
-		content.WriteString(h.tuiErrorStyle.Copy().Bold(false).Render(jfErr.UserMessage()))
+		messageStyle := h.tuiErrorStyle
+		content.WriteString(messageStyle.Bold(false).Render(jfErr.UserMessage()))
 		
 		// Suggestions
 		suggestions := jfErr.Suggestions()

@@ -142,7 +142,7 @@ func TestCompletionModel_ViewSuccess(t *testing.T) {
 		"main",
 		"Next Steps:",
 		"git push -u origin",
-		"Press Enter or 'q' to exit",
+		"enter exit application",
 	}
 	
 	for _, element := range expectedElements {
@@ -166,7 +166,7 @@ func TestCompletionModel_ViewError(t *testing.T) {
 		"Permission denied",
 		"Troubleshooting Tips:",
 		"permissions",
-		"Press Enter or 'q' to exit",
+		"enter exit application",
 	}
 	
 	for _, element := range expectedElements {

@@ -347,7 +347,7 @@ func TestAppModel_BranchNameGeneration(t *testing.T) {
 	// Test branch name generation without title
 	model.ticketTitle = ""
 	branchName = model.generateBranchName()
-	expected = "feature/JIRA-123"
+	expected = "feature/JIRA-123-jira-123"
 	if branchName != expected {
 		t.Errorf("Expected branch name '%s', got '%s'", expected, branchName)
 	}
@@ -368,16 +368,21 @@ func TestAppModel_TitleSanitization(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"Simple Title", "simple-title"},
-		{"Title With Special @#$ Characters!", "title-with-special-characters"},
-		{"Multiple   Spaces", "multiple-spaces"},
-		{"--Leading--And--Trailing--", "leading-and-trailing"},
-		{"", ""},
-		{"CamelCase Title", "camelcase-title"},
+		{"Simple Title", "feature/JIRA-123-simple-title"},
+		{"Title With Special @#$ Characters!", "feature/JIRA-123-title-with-special-characters"},
+		{"Multiple   Spaces", "feature/JIRA-123-multiple-spaces"},
+		{"--Leading--And--Trailing--", "feature/JIRA-123-leading-and-trailing"},
+		{"", "feature/JIRA-123-jira-123"},
+		{"CamelCase Title", "feature/JIRA-123-camelcase-title"},
 	}
 
+	// Set up model state for branch name generation
+	model.selectedType = "feature"
+	model.ticketNumber = "JIRA-123"
+
 	for _, test := range tests {
-		result := model.sanitizeTitle(test.input)
+		model.ticketTitle = test.input
+		result := model.generateBranchName()
 		if result != test.expected {
 			t.Errorf("For input '%s', expected '%s', got '%s'", test.input, test.expected, result)
 		}

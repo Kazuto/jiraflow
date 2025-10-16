@@ -24,9 +24,9 @@ var (
 	ticketNumber string
 	ticketTitle  string
 	
-	// Version information
-	appVersion   = "dev"
-	appBuildTime = "unknown"
+	// Version information (placeholders for build-time injection)
+	appVersion   = "dev"      //nolint:unused // Set by build process
+	appBuildTime = "unknown"  //nolint:unused // Set by build process
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -119,7 +119,7 @@ Configuration:
   You can customize branch types, naming conventions, and other settings
   by editing this file.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
+			_ = cmd.Help()
 		},
 	})
 }
@@ -178,7 +178,7 @@ func runInteractiveMode(cfg *config.Config, gitRepo git.GitRepository) error {
 	
 	// Wait for user input before launching TUI
 	var input string
-	fmt.Scanln(&input)
+	_, _ = fmt.Scanln(&input)
 	
 	// Launch TUI and handle any errors
 	if err := tui.RunTUI(cfg, gitRepo); err != nil {

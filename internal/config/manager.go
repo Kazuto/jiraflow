@@ -78,7 +78,7 @@ func (m *FileConfigManager) Load() (*Config, error) {
 func (m *FileConfigManager) CreateDefault() error {
 	// Create the directory structure
 	configDir := filepath.Dir(m.configPath)
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0750); err != nil {
 		return errors.NewConfigError("", configDir, fmt.Sprintf("failed to create configuration directory: %v", err), false)
 	}
 
@@ -107,7 +107,7 @@ sanitization:
 `
 
 	// Write to file
-	if err := os.WriteFile(m.configPath, []byte(yamlContent), 0644); err != nil {
+	if err := os.WriteFile(m.configPath, []byte(yamlContent), 0600); err != nil {
 		return errors.NewConfigError("", m.configPath, fmt.Sprintf("failed to write default configuration: %v", err), false)
 	}
 

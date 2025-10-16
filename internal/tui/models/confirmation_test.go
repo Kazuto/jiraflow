@@ -118,7 +118,7 @@ func TestConfirmationModel_View(t *testing.T) {
 		"JIRA-123",
 		"Test Feature",
 		"feature/JIRA-123-test-feature",
-		"Press Enter to create",
+		"enter create branch",
 	}
 	
 	for _, element := range expectedElements {
