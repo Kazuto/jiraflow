@@ -128,20 +128,43 @@ jobs:
     
     - name: Create release archives
       run: |
+        # Ensure we have the binaries
+        ls -la dist/
+        
+        # Create archives directory
         mkdir -p dist/archives
+        
+        # Get version
         VERSION=$(git describe --tags --always --dirty)
+        echo "Creating archives for version: $VERSION"
+        
+        # Change to dist directory and create archives
+        cd dist
         
         # Create tar.gz for Unix systems
-        cd dist && tar -czf archives/jiraflow-${VERSION}-linux-amd64.tar.gz jiraflow-linux-amd64
-        cd dist && tar -czf archives/jiraflow-${VERSION}-linux-arm64.tar.gz jiraflow-linux-arm64
-        cd dist && tar -czf archives/jiraflow-${VERSION}-darwin-amd64.tar.gz jiraflow-darwin-amd64
-        cd dist && tar -czf archives/jiraflow-${VERSION}-darwin-arm64.tar.gz jiraflow-darwin-arm64
+        if [ -f "jiraflow-linux-amd64" ]; then
+          tar -czf archives/jiraflow-${VERSION}-linux-amd64.tar.gz jiraflow-linux-amd64
+        fi
+        
+        if [ -f "jiraflow-linux-arm64" ]; then
+          tar -czf archives/jiraflow-${VERSION}-linux-arm64.tar.gz jiraflow-linux-arm64
+        fi
+        
+        if [ -f "jiraflow-darwin-amd64" ]; then
+          tar -czf archives/jiraflow-${VERSION}-darwin-amd64.tar.gz jiraflow-darwin-amd64
+        fi
+        
+        if [ -f "jiraflow-darwin-arm64" ]; then
+          tar -czf archives/jiraflow-${VERSION}-darwin-arm64.tar.gz jiraflow-darwin-arm64
+        fi
         
         # Create zip for Windows
-        cd dist && zip archives/jiraflow-${VERSION}-windows-amd64.zip jiraflow-windows-amd64.exe
+        if [ -f "jiraflow-windows-amd64.exe" ]; then
+          zip archives/jiraflow-${VERSION}-windows-amd64.zip jiraflow-windows-amd64.exe
+        fi
         
         echo "Release archives created in dist/archives/"
-        ls -la dist/archives/
+        ls -la archives/
     
     - name: Upload release assets
       uses: softprops/action-gh-release@v2
