@@ -28,15 +28,17 @@ const (
 
 // AppModel represents the main TUI application model
 type AppModel struct {
-	state       AppState
-	config      *config.Config
-	git         git.GitRepository
-	typeModel   models.TypeSelectorModel
-	branchModel models.BranchSelectorModel
-	inputModel  models.InputFormModel
-	err         error
-	width       int
-	height      int
+	state            AppState
+	config           *config.Config
+	git              git.GitRepository
+	typeModel        models.TypeSelectorModel
+	branchModel      models.BranchSelectorModel
+	inputModel       models.InputFormModel
+	confirmationModel models.ConfirmationModel
+	completionModel  models.CompletionModel
+	err              error
+	width            int
+	height           int
 	
 	// State data
 	selectedType   string
@@ -102,12 +104,18 @@ func NewAppModel(cfg *config.Config, gitRepo git.GitRepository) *AppModel {
 	// Initialize input form model (Jira client will be set later if available)
 	inputModel := models.NewInputFormModel(nil)
 	
+	// Initialize confirmation and completion models
+	confirmationModel := models.NewConfirmationModel()
+	completionModel := models.NewCompletionModel()
+	
 	return &AppModel{
-		state:       StateTypeSelection,
-		config:      cfg,
-		git:         gitRepo,
-		branchModel: branchModel,
-		inputModel:  inputModel,
+		state:             StateTypeSelection,
+		config:            cfg,
+		git:               gitRepo,
+		branchModel:       branchModel,
+		inputModel:        inputModel,
+		confirmationModel: confirmationModel,
+		completionModel:   completionModel,
 	}
 }
 
@@ -140,6 +148,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update component sizes
 		m.branchModel.SetSize(msg.Width, msg.Height-6) // Leave space for header/footer
 		m.inputModel.SetSize(msg.Width, msg.Height-6)
+		m.confirmationModel.SetSize(msg.Width, msg.Height-6)
+		m.completionModel.SetSize(msg.Width, msg.Height-6)
 		
 		return m, nil
 
@@ -253,20 +263,57 @@ func (m AppModel) updateTitleInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m AppModel) updateConfirmation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Placeholder - will be implemented in task 4.5
-	if key.Matches(msg, keys.Enter) {
-		m.finalBranch = fmt.Sprintf("%s/%s-%s", m.selectedType, m.ticketNumber, "sample-title")
+	var cmd tea.Cmd
+	
+	// Update the confirmation model
+	updatedConfirmation, confirmCmd := m.confirmationModel.Update(msg)
+	m.confirmationModel = updatedConfirmation
+	cmd = confirmCmd
+	
+	// Check if user confirmed
+	if m.confirmationModel.HasConfirmed() {
+		// Generate final branch name
+		m.finalBranch = m.generateBranchName()
+		
+		// Set confirmation data
+		m.confirmationModel.SetData(
+			m.selectedType,
+			m.selectedBranch,
+			m.ticketNumber,
+			m.ticketTitle,
+			m.finalBranch,
+		)
+		
+		// Attempt to create the branch
+		if err := m.createBranch(); err != nil {
+			// Set error state in completion model
+			m.completionModel.SetError(err.Error())
+		} else {
+			// Set success state in completion model
+			m.completionModel.SetSuccess(m.finalBranch, m.selectedBranch)
+		}
+		
 		m.state = StateComplete
+		return m, cmd
 	}
-	return m, nil
+	
+	return m, cmd
 }
 
 func (m AppModel) updateComplete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Placeholder - will be implemented in task 4.5
-	if key.Matches(msg, keys.Enter) {
+	var cmd tea.Cmd
+	
+	// Update the completion model
+	updatedCompletion, completeCmd := m.completionModel.Update(msg)
+	m.completionModel = updatedCompletion
+	cmd = completeCmd
+	
+	// Check if user wants to exit
+	if m.completionModel.ShouldExit() {
 		return m, tea.Quit
 	}
-	return m, nil
+	
+	return m, cmd
 }
 
 // View renders the TUI interface
@@ -313,9 +360,9 @@ func (m AppModel) renderHeader() string {
 	var stateText string
 	switch m.state {
 	case StateTypeSelection:
-		stateText = "Step 1/5: Select Branch Type"
+		stateText = "Step 1/4: Select Branch Type"
 	case StateBranchSelection:
-		stateText = "Step 2/5: Select Base Branch"
+		stateText = "Step 2/4: Select Base Branch"
 	case StateTicketInput:
 		stateText = "Step 3/4: Enter Ticket Information"
 	case StateTitleInput:
@@ -409,25 +456,24 @@ func (m AppModel) renderTitleInput() string {
 }
 
 func (m AppModel) renderConfirmation() string {
-	content := fmt.Sprintf("Selected type: %s\n", components.SelectedStyle.Render(m.selectedType))
-	content += fmt.Sprintf("Selected branch: %s\n", components.SelectedStyle.Render(m.selectedBranch))
-	content += fmt.Sprintf("Ticket number: %s\n", components.SelectedStyle.Render(m.ticketNumber))
-	content += fmt.Sprintf("Title: %s\n\n", components.SelectedStyle.Render(m.ticketTitle))
+	// Generate the final branch name for display
+	finalBranch := m.generateBranchName()
 	
-	content += "Branch to create:\n"
-	content += components.SelectedStyle.Render(m.finalBranch) + "\n\n"
-	content += "Press Enter to create this branch"
+	// Create a copy of the confirmation model with the data set
+	confirmationCopy := m.confirmationModel
+	confirmationCopy.SetData(
+		m.selectedType,
+		m.selectedBranch,
+		m.ticketNumber,
+		m.ticketTitle,
+		finalBranch,
+	)
 	
-	return content
+	return confirmationCopy.View()
 }
 
 func (m AppModel) renderComplete() string {
-	content := "✅ Branch created successfully!\n\n"
-	content += fmt.Sprintf("Created: %s\n", components.SelectedStyle.Render(m.finalBranch))
-	content += fmt.Sprintf("From: %s\n\n", components.SelectedStyle.Render(m.selectedBranch))
-	content += "Press Enter to exit"
-	
-	return content
+	return m.completionModel.View()
 }
 
 // Helper methods for state management
@@ -463,4 +509,81 @@ func (m *AppModel) SetSelectedData(branchType, baseBranch, ticket, title string)
 	m.selectedBranch = baseBranch
 	m.ticketNumber = ticket
 	m.ticketTitle = title
+}
+
+// generateBranchName generates the final branch name based on selected data
+func (m AppModel) generateBranchName() string {
+	// Basic branch name generation logic
+	// Format: type/ticket-sanitized-title
+	
+	sanitizedTitle := m.sanitizeTitle(m.ticketTitle)
+	
+	var branchName string
+	if sanitizedTitle != "" {
+		branchName = fmt.Sprintf("%s/%s-%s", m.selectedType, m.ticketNumber, sanitizedTitle)
+	} else {
+		branchName = fmt.Sprintf("%s/%s", m.selectedType, m.ticketNumber)
+	}
+	
+	// Apply length limit from config
+	maxLength := m.config.MaxBranchLength
+	if len(branchName) > maxLength {
+		// Truncate while preserving the type and ticket number
+		prefix := fmt.Sprintf("%s/%s", m.selectedType, m.ticketNumber)
+		if len(prefix) < maxLength {
+			remainingLength := maxLength - len(prefix) - 1 // -1 for the dash
+			if remainingLength > 0 && sanitizedTitle != "" {
+				truncatedTitle := sanitizedTitle
+				if len(truncatedTitle) > remainingLength {
+					truncatedTitle = truncatedTitle[:remainingLength]
+				}
+				branchName = fmt.Sprintf("%s-%s", prefix, truncatedTitle)
+			} else {
+				branchName = prefix
+			}
+		} else {
+			// If even the prefix is too long, just use it as is
+			branchName = prefix
+		}
+	}
+	
+	return branchName
+}
+
+// sanitizeTitle sanitizes the title for use in branch names
+func (m AppModel) sanitizeTitle(title string) string {
+	if title == "" {
+		return ""
+	}
+	
+	// Basic sanitization rules
+	sanitized := strings.ToLower(title)
+	
+	// Replace spaces with hyphens
+	sanitized = strings.ReplaceAll(sanitized, " ", "-")
+	
+	// Remove special characters (keep only alphanumeric and hyphens)
+	var result strings.Builder
+	for _, r := range sanitized {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			result.WriteRune(r)
+		}
+	}
+	sanitized = result.String()
+	
+	// Remove multiple consecutive hyphens
+	for strings.Contains(sanitized, "--") {
+		sanitized = strings.ReplaceAll(sanitized, "--", "-")
+	}
+	
+	// Remove leading and trailing hyphens
+	sanitized = strings.Trim(sanitized, "-")
+	
+	return sanitized
+}
+
+// createBranch creates the new Git branch
+func (m AppModel) createBranch() error {
+	// Create and checkout the new branch
+	return m.git.CreateBranch(m.finalBranch, m.selectedBranch)
 }
